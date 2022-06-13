@@ -1,0 +1,6 @@
+
+.depend
+.build
+*.o
+
+out/
