@@ -53,7 +53,6 @@ void *_q_read(void *args)
     aud_req *r = (aud_req *)buffer;
     if (bytes_read >= 0)
     {
-      printf("[CONSUMER]: freq %i vol %i dur %i", r->freq, r->vol, r->dur);
       aud_beep(1, r->vol, r->freq);
       struct timespec aud_sleep
       {

@@ -11,6 +11,7 @@
 #include <poll.h>
 #include <arch/chip/gnss.h>
 
+#include <10n2_aud.h>
 #include <10n2_gnss.h>
 
 /****************************************************************************
@@ -102,11 +103,13 @@ void *_gnss_q_read(void *args)
     printf("start GNSS OK\n");
   }
 
+  struct gnss_data gdata;
   while (gnss_running)
   {
 
     bytes_read = mq_receive(r_mq, buffer, GNSS_QUEUE_MSGSIZE, &prio);
     struct gnss_req *r = (struct gnss_req *)buffer;
+
     if (bytes_read >= 0)
     {
       for (int i = 0; i < r->num; i++)
@@ -119,10 +122,11 @@ void *_gnss_q_read(void *args)
         }
 
         /* Read and print POS data. */
-        ret = read_and_print(gnss_fd);
-        if (ret < 0)
+        ret = read_gnss(gnss_fd,&gdata);
+        if (ret == 0)
         {
-          break;
+          send_aud_seq(gnss_jingle,GNSS_JINGLE_LEN);
+          printf("GNSS lat:%f lon:%f\n",gdata.latitude,gdata.longitude);
         }
       }
     }
@@ -220,6 +224,46 @@ void double_to_dmf(double x, struct cxd56_gnss_dms_s *dmf)
  *   none.
  *
  ****************************************************************************/
+
+int read_gnss(int fd,struct gnss_data* d)
+{
+  int ret;
+  ret = read(fd, &posdat, sizeof(posdat));
+  if (ret < 0)
+  {
+    printf("read error\n");
+  }
+  else if (ret != sizeof(posdat))
+  {
+    ret = ERROR;
+    printf("read size error\n");
+    goto _err;
+  }
+  else
+  {
+    ret = OK;
+  }
+
+  if (posdat.receiver.pos_fixmode != CXD56_GNSS_PVT_POSFIX_INVALID)
+  {
+    d->date = posdat.receiver.date;
+    d->time = posdat.receiver.time;
+    d->latitude = posdat.receiver.latitude;
+    d->longitude = posdat.receiver.longitude;
+    d->type = posdat.sv->type;
+    d->svid = posdat.sv->svid;
+    d->stat = posdat.sv->stat;
+    d->siglevel = posdat.sv->siglevel;
+    return OK;
+  }
+  else{
+    return ERROR;
+  }
+
+_err:
+  return ret;
+
+}
 
 int read_and_print(int fd)
 {

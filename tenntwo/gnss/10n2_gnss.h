@@ -6,6 +6,7 @@
 extern "C" {
 #endif
 
+#include <arch/chip/gnss_type.h>
 struct cxd56_gnss_dms_s
 {
   int8_t   sign;
@@ -14,7 +15,19 @@ struct cxd56_gnss_dms_s
   uint32_t frac;
 };
 
+struct gnss_data{
+  struct cxd56_gnss_date_s date;
+  struct cxd56_gnss_time_s time;
+  double latitude;
+  double longitude;
+  uint16_t type;
+  uint8_t svid;
+  uint8_t stat;
+  float   siglevel;
+
+};
 void double_to_dmf(double x, struct cxd56_gnss_dms_s * dmf);
+int read_gnss(int fd,struct gnss_data* d);
 int read_and_print(int fd);
 int gnss_setparams(int fd);
 

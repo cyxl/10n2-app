@@ -25,6 +25,23 @@ static struct aud_req startup_jingle[STARTUP_JINGLE_LEN] = {
   {-40,300,100},
 };
 
+#define SHUTDOWN_JINGLE_LEN 5
+
+static struct aud_req shutdown_jingle[SHUTDOWN_JINGLE_LEN] = {
+  {-40,300,100},
+  {-40,600,100},
+  {-40,600,100},
+  {-40,500,100},
+  {-40,400,100},
+};
+
+#define GNSS_JINGLE_LEN 2
+
+static struct aud_req gnss_jingle[GNSS_JINGLE_LEN] = {
+  {-40,1400,100},
+  {-40,1500,100},
+};
+
 bool aud_init(void);
 
 bool aud_teardown(void);

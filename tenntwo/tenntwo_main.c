@@ -24,14 +24,15 @@ int main(int argc, char *argv[])
   send_gnss_req(gnss_r);
   //send_imu_req(imu_r);
   //send_cam_req(cam_r);
-  //send_aud_seq(startup_jingle,STARTUP_JINGLE_LEN);
+  send_aud_seq(startup_jingle,STARTUP_JINGLE_LEN);
   nxsig_usleep(5000000); /* usecs (arbitrary) */
+  send_aud_seq(shutdown_jingle,SHUTDOWN_JINGLE_LEN);
 
 
-  aud_teardown();
   cam_teardown();
   gnss_teardown();
   imu_teardown();
+  aud_teardown();
 
   return 0;
 }
