@@ -65,9 +65,8 @@
  * Pre-processor Definitions
  ****************************************************************************/
 
-char *DEVNAME = "/dev/imu0";
+char *DEV2NAME = "/dev/imu0";
 
-uint16_t IMU_SIGNO = 13;
 
 struct vel_gyro_s
 {
@@ -150,7 +149,7 @@ int main(int argc, FAR char *argv[])
 {
   int fd;
 
-  fd = open(DEVNAME, O_RDONLY);
+  fd = open(DEV2NAME, O_RDONLY);
   read(fd, &g_data, sizeof(struct vel_gyro_s));
 
   printf("Sensing start...\n");
@@ -160,7 +159,7 @@ int main(int argc, FAR char *argv[])
   if (fd < 0)
   {
     printf("Device %s open failure. %d\n",
-           DEVNAME, fd);
+           DEV2NAME, fd);
     return -1;
   }
 
