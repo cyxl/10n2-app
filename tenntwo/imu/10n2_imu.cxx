@@ -66,7 +66,12 @@ void *_imu_q_read(void *args)
             for (int i = 0; i < r->num; i++)
             {
                 read(imu_fd, &imu_buf, sizeof(struct vel_gyro_s));
-                struct vel_gyro_s vg_d = get_mpu_data((int16_t*)imu_buf);
+                struct timespec del_sleep
+                {
+                    r->delay / 1000, (r->delay % 1000) * 1e6
+                };
+                nanosleep(&del_sleep, NULL);
+                struct vel_gyro_s vg_d = get_mpu_data((int16_t *)imu_buf);
                 dump_data(vg_d);
             }
         }
