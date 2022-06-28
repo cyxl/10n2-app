@@ -36,6 +36,8 @@ static void test_log_printf(const char *s)
 void *_tf_pi_q_read(void *args)
 {
 
+    RegisterDebugLogCallback(test_log_printf);
+    setup();
     (void)args; /* Suppress -Wunused-parameter warning. */
     /* Initialize the queue attributes */
 
@@ -108,9 +110,13 @@ bool tf_pi_init(void)
 {
     printf("tf pi init\n");
     tf_pi_running = true;
-    RegisterDebugLogCallback(test_log_printf);
-    setup();
-    pthread_create(&tf_pi_th_consumer, NULL, &_tf_pi_q_read, NULL);
+    pthread_attr_t attr;
+    pthread_attr_init(&attr);
+    if (0 != pthread_attr_setstacksize(&attr, 32768))
+    {
+        printf("Error setting stack size\n");
+    }
+    pthread_create(&tf_pi_th_consumer, &attr, &_tf_pi_q_read, NULL);
 
     return true;
 }

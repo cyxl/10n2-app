@@ -12,7 +12,6 @@
 #include <10n2_aud.h>
 #include <fcntl.h>
 
-
 static bool running = true;
 #define QUEUE_NAME "/aud_queue" /* Queue name. */
 #define QUEUE_PERMS ((int)(0644))
@@ -53,7 +52,7 @@ void *_q_read(void *args)
     aud_req *r = (aud_req *)buffer;
     if (bytes_read >= 0)
     {
-      aud_beep(1, r->vol, r->freq);
+      aud_beep(r->en, r->vol, r->freq);
       struct timespec aud_sleep
       {
         r->dur / 1000, (r->dur % 1000) * 1e6
@@ -72,24 +71,23 @@ void *_q_read(void *args)
   }
   printf("aud cleaning mq\n");
   mq_close(r_mq);
-  //mq_unlink(QUEUE_NAME);
+  // mq_unlink(QUEUE_NAME);
   return NULL;
 }
 
-bool send_aud_seq(aud_req* req,uint8_t len)
+bool send_aud_seq(aud_req *req, uint8_t len)
 {
 
-  for (int i=0;i<len;i++)
+  for (int i = 0; i < len; i++)
   {
-    send_aud_beep(req[i].vol,req[i].freq,req[i].dur);
+    send_aud_beep(req[i].en,req[i].vol, req[i].freq, req[i].dur);
   }
 
   return true;
-
 }
-bool send_aud_beep(int16_t vol, uint16_t freq, uint32_t dur)
+bool send_aud_beep(bool en,int16_t vol, uint16_t freq, uint32_t dur)
 {
-  aud_req r = {vol, freq, dur};
+  aud_req r = {en,vol, freq, dur};
   mqd_t mq = mq_open(QUEUE_NAME, O_WRONLY);
   if (mq < 0)
   {
@@ -137,6 +135,8 @@ bool aud_init(void)
 
   pthread_create(&th_consumer, NULL, &_q_read, NULL);
 
+  // off
+  aud_beep(0, 255, 0);
   return true;
 }
 

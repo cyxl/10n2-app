@@ -1,3 +1,6 @@
 #include <cstdint>
 
-extern const unsigned int g_hello_world_model_data_size;extern const unsigned char g_hello_world_model_data[];
+#ifndef HW_M_H
+#define HW_M_H
+extern const unsigned int g_data_len;extern const unsigned char g_data[];
+#endif

@@ -17,6 +17,7 @@ bool imu_init(void);
 bool imu_teardown(void);
 
 bool send_imu_req(struct imu_req req);
+extern struct vel_gyro_s current_pmu;
 #ifdef __cplusplus
 }
 #endif

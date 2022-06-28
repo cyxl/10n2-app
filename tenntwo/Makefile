@@ -4,7 +4,9 @@ IMU_SRC_DIR = imu
 GNSS_SRC_DIR = gnss
 CAM_SRC_DIR = cam
 AUD_SRC_DIR = aud
+BTN_SRC_DIR = btn
 TF_PI_SRC_DIR = tf_pi
+PMU_HDLR_SRC_DIR = pmu_handler
 
 # Command name (Public function 'int <APPNAME>_main(void)' required)
 APPNAME = 
@@ -13,7 +15,7 @@ APPNAME =
 PRIORITY =
 
 # Application stack memory size (Default: 2048)
-STACKSIZE =
+STACKSIZE = 
 
 # Main source code
 MAINSRC =
@@ -35,7 +37,9 @@ CFLAGS += -I$(IMU_SRC_DIR)
 CFLAGS += -I$(GNSS_SRC_DIR)
 CFLAGS += -I$(CAM_SRC_DIR)
 CFLAGS += -I$(AUD_SRC_DIR)
+CFLAGS += -I$(BTN_SRC_DIR)
 CFLAGS += -I$(TF_PI_SRC_DIR)
+CFLAGS += -I$(PMU_HDLR_SRC_DIR)
 
 CFLAGS += -I$(TOPDIR)/arch/arm/src/cxd56xx/
 
@@ -50,6 +54,8 @@ CXXFLAGS += -I$(GNSS_SRC_DIR)
 CXXFLAGS += -I$(IMU_SRC_DIR)
 CXXFLAGS += -I$(AUD_SRC_DIR)
 CXXFLAGS += -I$(CAM_SRC_DIR)
+CXXFLAGS += -I$(BTN_SRC_DIR)
 CXXFLAGS += -I$(TF_PI_SRC_DIR)
+CXXFLAGS += -I$(PMU_HDLR_SRC_DIR)
 
 include $(SPRESENSE_HOME)/.vscode/application.mk

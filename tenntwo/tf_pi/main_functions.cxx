@@ -49,7 +49,7 @@ void setup() {
 
   // Map the model into a usable data structure. This doesn't involve any
   // copying or parsing, it's a very lightweight operation.
-  model = tflite::GetModel(g_hello_world_model_data);
+  model = tflite::GetModel(g_data);
   if (model->version() != TFLITE_SCHEMA_VERSION) {
     TF_LITE_REPORT_ERROR(error_reporter,
                          "Model provided is schema version %d not equal "
@@ -69,6 +69,7 @@ void setup() {
 
   // Allocate memory from the tensor_arena for the model's tensors.
   TfLiteStatus allocate_status = interpreter->AllocateTensors();
+  printf("Arena size %d", static_interpreter.arena_used_bytes());
   if (allocate_status != kTfLiteOk) {
     TF_LITE_REPORT_ERROR(error_reporter, "AllocateTensors() failed");
     return;
@@ -97,6 +98,9 @@ void loop() {
   // Place the quantized input in the model's input tensor
   input->data.int8[0] = x_quantized;
 
+  printf("tf parms %li %f\n",output->params.zero_point,output->params.scale);
+  printf("tf parms %li %f\n",input->params.zero_point,input->params.scale);
+
   // Run inference, and report any error
   TfLiteStatus invoke_status = interpreter->Invoke();
   if (invoke_status != kTfLiteOk) {
@@ -107,8 +111,10 @@ void loop() {
 
   // Obtain the quantized output from model's output tensor
   int8_t y_quantized = output->data.int8[0];
+  printf ("quant y %i\n",y_quantized);
+  printf ("quant x %i\n",x_quantized);
   // Dequantize the output from integer to floating-point
-  float y = (y_quantized - output->params.zero_point) * output->params.scale;
+  double y = (y_quantized - output->params.zero_point) * output->params.scale;
 
   // Output the results. A custom HandleOutput function can be implemented
   // for each supported hardware target.
