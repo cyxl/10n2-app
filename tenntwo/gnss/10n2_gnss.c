@@ -37,6 +37,8 @@ static bool gnss_running = true;
 static struct mq_attr gnss_attr_mq = GNSS_QUEUE_ATTR_INITIALIZER;
 static pthread_t gnss_th_consumer;
 
+struct gnss_data current_gnss;
+
 void *_gnss_q_read(void *args)
 {
   (void)args; /* Suppress -Wunused-parameter warning. */
@@ -120,13 +122,14 @@ void *_gnss_q_read(void *args)
           printf("sigwaitinfo error %d\n", ret);
           break;
         }
-
-        /* Read and print POS data. */
-        ret = read_gnss(gnss_fd,&gdata);
+        ret = read_gnss(gnss_fd, &gdata);
         if (ret == 0)
         {
-          send_aud_seq(gnss_jingle,GNSS_JINGLE_LEN);
-          printf("GNSS lat:%f lon:%f\n",gdata.latitude,gdata.longitude);
+          current_gnss = gdata;
+        }
+        else
+        {
+          current_gnss.type = NO_TYPE;
         }
       }
     }
@@ -135,8 +138,6 @@ void *_gnss_q_read(void *args)
       poll_sleep = GNSS_QUEUE_POLL;
       nanosleep(&poll_sleep, NULL);
     }
-
-    fflush(stdout);
   }
   printf("gnss cleaning mq\n");
   ret = ioctl(gnss_fd, CXD56_GNSS_IOCTL_STOP, 0);
@@ -165,6 +166,7 @@ bool send_gnss_req(struct gnss_req req)
 bool gnss_init(void)
 {
   printf("gnss init\n");
+  current_gnss.type = NO_TYPE;
   gnss_running = true;
 
   pthread_create(&gnss_th_consumer, NULL, &_gnss_q_read, NULL);
@@ -225,7 +227,7 @@ void double_to_dmf(double x, struct cxd56_gnss_dms_s *dmf)
  *
  ****************************************************************************/
 
-int read_gnss(int fd,struct gnss_data* d)
+int read_gnss(int fd, struct gnss_data *d)
 {
   int ret;
   ret = read(fd, &posdat, sizeof(posdat));
@@ -256,13 +258,13 @@ int read_gnss(int fd,struct gnss_data* d)
     d->siglevel = posdat.sv->siglevel;
     return OK;
   }
-  else{
+  else
+  {
     return ERROR;
   }
 
 _err:
   return ret;
-
 }
 
 int read_and_print(int fd)

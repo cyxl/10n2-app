@@ -7,6 +7,38 @@ extern "C" {
 #endif
 
 
+enum tnt_menu{
+    top = 0,
+    pos,
+    img,
+    num_menu
+};
+
+enum tnt_pos_menu{
+    pos_off = 0,
+    imu,
+    gnss,
+    imu_gnss,
+    num_pos_menu,
+};
+
+enum tnt_top_menu{
+    top_running = 0,
+    top_unused1,
+    top_unused2,
+    top_quit,
+    num_top_menu,
+};
+
+enum tnt_img_menu{
+    cam_off = 0,
+    cam_on,
+    num_img_menu,
+};
+
+extern uint8_t current_menu;
+extern uint8_t current_submenu;
+
 bool btn_init(void);
 bool btn_teardown(void);
 

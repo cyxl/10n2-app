@@ -55,6 +55,46 @@ static struct aud_req btn_on_jingle[BTN_ON_JINGLE_LEN] = {
   {0,255,0,10}, //off
 };
 
+#define BTN_MENU_1_J_LEN 2
+static struct aud_req btn_menu_1_j[BTN_MENU_1_J_LEN] = {
+  {1,-40,700,150}, {0,255,0,0}, //off
+};
+
+#define BTN_MENU_2_J_LEN 4
+static struct aud_req btn_menu_2_j[BTN_MENU_2_J_LEN] = {
+  {1,-40,700,150}, {0,255,0,40}, //off
+  {1,-40,700,150}, {0,255,0,0}, //off
+};
+
+#define BTN_MENU_3_J_LEN 6
+static struct aud_req btn_menu_3_j[BTN_MENU_3_J_LEN] = {
+  {1,-40,700,150}, {0,255,0,40}, //off
+  {1,-40,700,150}, {0,255,0,40}, //off
+  {1,-40,700,150}, {0,255,0,0}, //off
+};
+
+#define BTN_SUBMENU_1_J_LEN 2
+static struct aud_req btn_submenu_1_j[BTN_SUBMENU_1_J_LEN] = {
+  {1,-40,900,100}, {0,255,0,0}, //off
+};
+
+#define BTN_SUBMENU_2_J_LEN 4
+static struct aud_req btn_submenu_2_j[BTN_SUBMENU_2_J_LEN] = {
+  {1,-40,900,100}, {0,255,0,20}, //off
+  {1,-40,900,100}, {0,255,0,0}, //off
+};
+
+#define BTN_SUBMENU_3_J_LEN 6
+static struct aud_req btn_submenu_3_j[BTN_SUBMENU_3_J_LEN] = {
+  {1,-40,900,100}, {0,255,0,20}, //off
+  {1,-40,900,100}, {0,255,0,20}, //off
+  {1,-40,900,100}, {0,255,0,0}, //off
+};
+
+#define BTN_ERR_J_LEN 2
+static struct aud_req btn_err_j[BTN_ERR_J_LEN] = {
+  {1,-40,300,400}, {0,255,0,0}, //off
+};
 bool aud_init(void);
 
 bool aud_teardown(void);

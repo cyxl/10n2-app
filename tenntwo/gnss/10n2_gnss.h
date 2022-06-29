@@ -1,6 +1,7 @@
 #ifndef GNSS_H
 #define GNSS_H
 
+#define NO_TYPE 42
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,6 +41,8 @@ bool gnss_init(void);
 bool gnss_teardown(void);
 
 bool send_gnss_req(struct gnss_req req);
+
+extern struct gnss_data current_gnss;
 
 #ifdef __cplusplus
 }
