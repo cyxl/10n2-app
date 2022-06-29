@@ -17,7 +17,8 @@
 #include <10n2_aud.h>
 
 #define BTN_LONG_HOLD 150
-#define BTN_SHORT_HOLD 20
+#define BTN_REALLY_SHORT_HOLD 5
+#define BTN_SHORT_HOLD 50
 #define BTN_DOWN 0
 #define BTN_UP 1
 
@@ -28,11 +29,8 @@ static pthread_t btn_th_consumer;
 uint8_t current_menu = 0;
 uint8_t current_submenu = 0;
 
-void toggle_menu()
+void play_menu_jingle()
 {
-    current_menu = (current_menu + 1) % num_menu;
-    current_submenu = 0;
-
     if (current_menu == top)
     {
         send_aud_seq(btn_menu_1_j, BTN_MENU_1_J_LEN);
@@ -44,24 +42,6 @@ void toggle_menu()
     else if (current_menu == img)
     {
         send_aud_seq(btn_menu_3_j, BTN_MENU_3_J_LEN);
-    }
-}
-void toggle_submenu()
-{
-    if (current_menu == top)
-    {
-        send_aud_seq(btn_menu_1_j, BTN_MENU_1_J_LEN);
-        current_submenu = (current_submenu + 1) % num_top_menu;
-    }
-    else if (current_menu == pos)
-    {
-        send_aud_seq(btn_menu_2_j, BTN_MENU_2_J_LEN);
-        current_submenu = (current_submenu + 1) % num_pos_menu;
-    }
-    else if (current_menu == img)
-    {
-        send_aud_seq(btn_menu_3_j, BTN_MENU_3_J_LEN);
-        current_submenu = (current_submenu + 1) % num_img_menu;
     }
 
     if ((int)current_submenu == 0)
@@ -74,6 +54,30 @@ void toggle_submenu()
         send_aud_seq(btn_submenu_4_j, BTN_SUBMENU_4_J_LEN);
     else
         send_aud_seq(btn_err_j, BTN_ERR_J_LEN);
+}
+
+void toggle_menu()
+{
+    current_menu = (current_menu + 1) % num_menu;
+    current_submenu = 0;
+    play_menu_jingle();
+}
+
+void toggle_submenu()
+{
+    if (current_menu == top)
+    {
+        current_submenu = (current_submenu + 1) % num_top_menu;
+    }
+    else if (current_menu == pos)
+    {
+        current_submenu = (current_submenu + 1) % num_pos_menu;
+    }
+    else if (current_menu == img)
+    {
+        current_submenu = (current_submenu + 1) % num_img_menu;
+    }
+    play_menu_jingle();
 }
 
 void *_btn_q_read(void *args)
@@ -105,7 +109,12 @@ void *_btn_q_read(void *args)
         }
         if (val == BTN_UP && last_val == BTN_DOWN)
         {
-            if (hold_cnt <= BTN_SHORT_HOLD)
+            printf("cnt %i\n",hold_cnt);
+            if (hold_cnt <= BTN_REALLY_SHORT_HOLD)
+            {
+                play_menu_jingle();
+            }
+            else if (hold_cnt <= BTN_SHORT_HOLD)
             {
                 // sub menu toggle
                 printf("submenu!\n");

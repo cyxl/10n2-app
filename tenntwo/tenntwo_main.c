@@ -29,7 +29,6 @@ int main(int argc, char *argv[])
   // tf_pi_init();
 
   // send_tf_pi_req(tf_pi_r);
-  // send_cam_req(cam_r);
 
   while (1)
   {
