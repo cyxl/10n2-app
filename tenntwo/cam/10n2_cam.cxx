@@ -14,7 +14,7 @@
 #include <arch/chip/audio.h>
 
 #include <10n2_cam.h>
-#include <image_provider.h>
+#include <tnt_image_provider.h>
 #include <camera_fileutil.h>
 
 static bool cam_running = true;
@@ -26,7 +26,7 @@ static bool cam_running = true;
 
 #define CAM_QUEUE_POLL ((struct timespec){0, 100000000})
 
-#define IMG_SAVE_DIR "/mnt/sd0"
+#define IMG_SAVE_DIR "/mnt/sd0/img"
 static struct mq_attr cam_attr_mq = CAM_QUEUE_ATTR_INITIALIZER;
 static pthread_t cam_th_consumer;
 
@@ -38,6 +38,7 @@ void *_cam_q_read(void *args)
 
     /* Create the message queue. The queue reader is NONBLOCK. */
     mqd_t r_mq = mq_open(CAM_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, CAM_QUEUE_PERMS, &cam_attr_mq);
+    futil_initialize();
 
     if (r_mq < 0)
     {
@@ -53,8 +54,6 @@ void *_cam_q_read(void *args)
     char namebuf[128];
     struct timespec poll_sleep;
     // TODO make size configurable
-    unsigned char *buf = (unsigned char *)memalign(32, 96 * 96);
-    unsigned curr_time = (unsigned)time(NULL);
 
     while (cam_running)
     {
@@ -63,16 +62,18 @@ void *_cam_q_read(void *args)
         cam_req *r = (cam_req *)buffer;
         if (bytes_read >= 0)
         {
+            unsigned curr_time = (unsigned)time(NULL);
+            uint32_t bufsize = r->width * r->height * (r->color?2:1);
+            unsigned char *buf = (unsigned char *)memalign(32, bufsize);
             for (int i = 0; i < r->num; i++)
             {
                 bzero(namebuf, 128);
                 printf("getting image \n");
-                spresense_getimage(buf);
+                getimage(buf,r->width,r->height,r->color);
                 printf("init futil \n");
-                futil_initialize();
                 printf("writing image\n");
-                snprintf(namebuf, 128, "%s/10n20-%i-%i.%s", IMG_SAVE_DIR, curr_time, i, "rgb");
-                if (futil_writeimage(buf, 96 * 96, namebuf) < 0)
+                snprintf(namebuf, 128, "%s/%s/tnt-%i-%i-%ix%i.%s", IMG_SAVE_DIR,r->dir, curr_time, i,r->width,r->height, r->color?"yuv":"data");
+                if (futil_writeimage(buf, bufsize, namebuf) < 0)
                 {
                     printf("ERROR creating image \n");
                 }
@@ -82,6 +83,7 @@ void *_cam_q_read(void *args)
                 };
                 nanosleep(&aud_sleep, NULL);
             }
+            free(buf);
         }
         else
         {

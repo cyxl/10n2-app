@@ -124,12 +124,12 @@ void *_gnss_q_read(void *args)
           printf("sigwaitinfo error %d\n", ret);
           break;
         }
-        printf("reading gnss\n");
         ret = read_gnss(gnss_fd, &gdata);
         if (ret == OK)
         {
           current_gnss = gdata;
           printf("got lat:%lf lon:%lf\n",current_gnss.latitude,current_gnss.longitude);
+          send_aud_seq(gnss_jingle,GNSS_JINGLE_LEN);
         }
         else
         {
@@ -264,7 +264,6 @@ int read_gnss(int fd, struct gnss_data *d)
   }
   else
   {
-    printf("fix mode %i\n",posdat.receiver.pos_fixmode);
     return ERROR;
   }
 

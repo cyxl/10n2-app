@@ -6,7 +6,9 @@
 extern "C" {
 #endif
 
-int spresense_getimage(unsigned char *out_data);
+#include <stdint.h>
+
+int getimage(unsigned char *out_data,uint16_t vsize,uint16_t hsize,bool color);
 
 #ifdef __cplusplus
 }

@@ -36,11 +36,10 @@ static struct aud_req shutdown_jingle[SHUTDOWN_JINGLE_LEN] = {
   {1,-40,400,100},
 };
 
-#define GNSS_JINGLE_LEN 2
+#define GNSS_JINGLE_LEN 1
 
 static struct aud_req gnss_jingle[GNSS_JINGLE_LEN] = {
-  {1,-40,1400,100},
-  {1,-40,1500,100},
+  {1,-40,400,50},
 };
 
 

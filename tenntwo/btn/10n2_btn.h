@@ -32,7 +32,8 @@ enum tnt_top_menu{
 
 enum tnt_img_menu{
     cam_off = 0,
-    cam_on,
+    cam_color_on,
+    cam_bw_on,
     num_img_menu,
 };
 

@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
   struct imu_req imu_r = {10, 100};
   struct gnss_req gnss_r = {10, 100};
   struct tf_pi_req tf_pi_r = {50, 1000};
-  //  cam_init();
+  cam_init();
   imu_init();
   gnss_init();
   aud_init();
@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
   }
 
   send_aud_seq(shutdown_jingle, SHUTDOWN_JINGLE_LEN);
-  // cam_teardown();
+  cam_teardown();
   gnss_teardown();
   imu_teardown();
   menu_handler_teardown();

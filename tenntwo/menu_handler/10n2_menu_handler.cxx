@@ -24,9 +24,10 @@ static bool menu_handler_running = true;
 
 static pthread_t menu_handler_th;
 
-struct cam_req cam_r = {1, 100};
+struct cam_req cam_c_r = {3, 0,96,96,1,"test"}; //color 3 @ 3hz
+struct cam_req cam_bw_r = {3, 0,96,96,0,"test"}; //color 3 @ 3hz
 
-#define CAM_PERIOD 10
+#define CAM_PERIOD 1000
 #define POS_PERIOD 1
 FILE *pos_pf = NULL;
 
@@ -72,10 +73,15 @@ void update_service(uint8_t last_submenu, uint32_t tick)
 {
     if (current_menu == img)
     {
-        if (current_submenu == cam_on)
+        if (current_submenu == cam_color_on)
         {
             if ((tick % CAM_PERIOD) == 0)
-                send_cam_req(cam_r); // 10hz
+                send_cam_req(cam_c_r);
+        }
+        else if (current_submenu == cam_bw_on)
+        {
+            if ((tick % CAM_PERIOD) == 0)
+                send_cam_req(cam_bw_r);
         }
     }
     else if (current_menu == pos)

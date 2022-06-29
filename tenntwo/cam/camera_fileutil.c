@@ -85,24 +85,9 @@ const char *futil_initialize(void)
 int futil_writeimage(uint8_t *data, size_t len, const char *fullname)
 {
   static char s_fname[IMAGE_FILENAME_LEN];
-  static int s_framecount = 0;
 
   FILE *fp;
 
-  s_framecount++;
-  if (s_framecount >= 1000)
-    {
-      s_framecount = 1;
-    }
-
-/*
-  memset(s_fname, 0, sizeof(s_fname));
-
-  snprintf(s_fname,
-           IMAGE_FILENAME_LEN,
-           "%s/VIDEO%03d.%s",
-           save_dir, s_framecount, fsuffix);
-           */
 
   printf("FILENAME:%s\n", fullname);
 
