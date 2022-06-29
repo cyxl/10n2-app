@@ -24,7 +24,6 @@ static bool imu_running = true;
 
 #define IMU_QUEUE_POLL ((struct timespec){0, 100000000})
 
-#define IMU_SAVE_DIR "/mnt/sd0/foo"
 static struct mq_attr imu_attr_mq = IMU_QUEUE_ATTR_INITIALIZER;
 static pthread_t imu_th_consumer;
 
@@ -34,19 +33,8 @@ struct vel_gyro_s current_pmu;
 
 void *_imu_q_read(void *args)
 {
-    char namebuf[128];
-    snprintf(namebuf, 128, "%s/imu-data.%s", IMU_SAVE_DIR, "rgb");
-    printf ("saving to :%s\n",namebuf);
-
     (void)args; /* Suppress -Wunused-parameter warning. */
     /* Initialize the queue attributes */
-     struct stat stat_buf;
-
-     int ret = stat("/mnt/sd0", &stat_buf);
-     if (ret < 0)
-    {
-        sprintf("no stat!! %s\n", strerror(errno));
-    }
 
     /* Create the message queue. The queue reader is NONBLOCK. */
     mqd_t r_mq = mq_open(IMU_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, IMU_QUEUE_PERMS, &imu_attr_mq);
@@ -69,17 +57,6 @@ void *_imu_q_read(void *args)
     struct timespec poll_sleep;
     // TODO make size configurable
     
-    FILE *fp = fopen(namebuf,"w+");
-    if (fp == NULL)
-    {
-        printf("Unable to open imu! :%s\n",strerror(errno));
-    }
-    else {
-        printf("success!  opened imu output file\n");
-    }
-    ret = fprintf(fp,"acx,acy,acz,gyx,gyy,gyz\n");
-    printf("wrote %i\n",ret);
-
     while (imu_running)
     {
         bytes_read = mq_receive(r_mq, buffer, IMU_QUEUE_MSGSIZE, &prio);
@@ -95,15 +72,7 @@ void *_imu_q_read(void *args)
                 };
                 nanosleep(&del_sleep, NULL);
                 current_pmu = get_mpu_data((int16_t *)imu_buf);
-                fprintf(fp,"%i,%i,%i,%i,%i,%i\n",
-                current_pmu.ac_x,
-                current_pmu.ac_y,
-                current_pmu.ac_z,
-                current_pmu.gy_x,
-                current_pmu.gy_y,
-                current_pmu.gy_z
-                );
-                dump_data(current_pmu);
+        //        dump_data(current_pmu);
             }
         }
         else
@@ -113,14 +82,6 @@ void *_imu_q_read(void *args)
         }
 
         fflush(stdout);
-    }
-    fflush(fp);
-    if (fclose(fp) != 0)
-    {
-        printf("Unable to close imu file! :%s\n",strerror(errno));
-    }
-    else {
-        printf("success!  closed imu output file\n");
     }
     printf("imu cleaning mq\n");
     mq_close(r_mq);

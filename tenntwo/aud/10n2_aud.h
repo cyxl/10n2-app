@@ -91,6 +91,13 @@ static struct aud_req btn_submenu_3_j[BTN_SUBMENU_3_J_LEN] = {
   {1,-40,900,100}, {0,255,0,0}, //off
 };
 
+#define BTN_SUBMENU_4_J_LEN 8
+static struct aud_req btn_submenu_4_j[BTN_SUBMENU_4_J_LEN] = {
+  {1,-40,900,100}, {0,255,0,20}, //off
+  {1,-40,900,100}, {0,255,0,20}, //off
+  {1,-40,900,100}, {0,255,0,0}, //off
+  {1,-40,900,100}, {0,255,0,0}, //off
+};
 #define BTN_ERR_J_LEN 2
 static struct aud_req btn_err_j[BTN_ERR_J_LEN] = {
   {1,-40,300,400}, {0,255,0,0}, //off

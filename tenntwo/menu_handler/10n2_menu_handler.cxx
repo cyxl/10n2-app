@@ -48,9 +48,9 @@ void cycle_pos_fd()
 
     unsigned curr_time = (unsigned)time(NULL);
     char namebuf[128];
-    snprintf(namebuf, 128, "%s/imu-data.%s", POS_SAVE_DIR, "csv");
+    snprintf(namebuf, 128, "%s/imu-data-%i-%i.%s", POS_SAVE_DIR, current_submenu, curr_time, "csv");
     printf("saving to :%s\n", namebuf);
-    pos_pf = fopen(namebuf, "w+");
+    pos_pf = fopen(namebuf, "wb+");
     if (pos_pf == NULL)
     {
         printf("Unable to open pos! :%s\n", strerror(errno));
@@ -80,8 +80,10 @@ void update_service(uint8_t last_submenu, uint32_t tick)
     }
     else if (current_menu == pos)
     {
-        if (last_submenu != current_menu)
+        if (last_submenu != current_submenu)
+        {
             cycle_pos_fd();
+        }
 
         unsigned curr_time = (unsigned)time(NULL);
         if (current_submenu == imu)
@@ -146,9 +148,10 @@ void *_menu_run(void *args)
         0, 1 * (long)1e6
     };
 
+    uint32_t tick = 0;
     while (menu_handler_running)
     {
-        update_service(last_menu, last_submenu);
+        update_service(last_submenu, tick);
         last_menu = current_menu;
         last_submenu = current_submenu;
         nanosleep(&del_sleep, NULL);

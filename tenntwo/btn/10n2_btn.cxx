@@ -16,7 +16,7 @@
 #include <10n2_btn.h>
 #include <10n2_aud.h>
 
-#define BTN_LONG_HOLD 200
+#define BTN_LONG_HOLD 150
 #define BTN_SHORT_HOLD 20
 #define BTN_DOWN 0
 #define BTN_UP 1
@@ -70,6 +70,8 @@ void toggle_submenu()
         send_aud_seq(btn_submenu_2_j, BTN_SUBMENU_2_J_LEN);
     else if ((int)current_submenu == 2)
         send_aud_seq(btn_submenu_3_j, BTN_SUBMENU_3_J_LEN);
+    else if ((int)current_submenu == 3)
+        send_aud_seq(btn_submenu_4_j, BTN_SUBMENU_4_J_LEN);
     else
         send_aud_seq(btn_err_j, BTN_ERR_J_LEN);
 }

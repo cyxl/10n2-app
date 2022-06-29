@@ -94,11 +94,13 @@ void *_gnss_q_read(void *args)
   if (ret != OK)
   {
     printf("gnss_setparams failed. %d\n", ret);
+    return false;
   }
   ret = ioctl(gnss_fd, CXD56_GNSS_IOCTL_START, CXD56_GNSS_STMOD_HOT);
   if (ret < 0)
   {
     printf("start GNSS ERROR %d\n", errno);
+    return false;
   }
   else
   {
@@ -122,10 +124,12 @@ void *_gnss_q_read(void *args)
           printf("sigwaitinfo error %d\n", ret);
           break;
         }
+        printf("reading gnss\n");
         ret = read_gnss(gnss_fd, &gdata);
-        if (ret == 0)
+        if (ret == OK)
         {
           current_gnss = gdata;
+          printf("got lat:%lf lon:%lf\n",current_gnss.latitude,current_gnss.longitude);
         }
         else
         {
@@ -260,6 +264,7 @@ int read_gnss(int fd, struct gnss_data *d)
   }
   else
   {
+    printf("fix mode %i\n",posdat.receiver.pos_fixmode);
     return ERROR;
   }
 
