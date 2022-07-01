@@ -16,10 +16,10 @@ enum tnt_menu{
 
 enum tnt_pos_menu{
     pos_off = 0,
+    imu_gnss,
+    num_pos_menu, //TODO
     imu,
     gnss,
-    imu_gnss,
-    num_pos_menu,
 };
 
 enum tnt_top_menu{
@@ -32,9 +32,9 @@ enum tnt_top_menu{
 
 enum tnt_img_menu{
     cam_off = 0,
-    cam_color_on,
     cam_bw_on,
-    num_img_menu,
+    num_img_menu,  //TODO 
+    cam_color_on,
 };
 
 extern uint8_t current_menu;

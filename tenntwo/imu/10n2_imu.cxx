@@ -27,9 +27,54 @@ static bool imu_running = true;
 static struct mq_attr imu_attr_mq = IMU_QUEUE_ATTR_INITIALIZER;
 static pthread_t imu_th_consumer;
 
+float imu_ac_buf[2][6][IMU_BUF_SIZE]; // ping pong buffer for imu samples
+
+int8_t current_imu_buffer = 0;
+uint8_t next_imu_sample_idx = 0;
+
 #define IMU_DEVNAME "/dev/imu0"
 
 struct vel_gyro_s current_pmu;
+
+float *get_latest_imu_samples(uint8_t sample_type)
+{
+    if ((next_imu_sample_idx - IMU_SAMPLE_SIZE) < 0)
+        return nullptr;
+    return &imu_ac_buf[current_imu_buffer][sample_type][next_imu_sample_idx - IMU_SAMPLE_SIZE];
+}
+void write_imu_sample(const vel_gyro_s &s, uint8_t ping_buf_idx, uint8_t sample_buf_idx)
+{
+    imu_ac_buf[ping_buf_idx][0][sample_buf_idx] = float(s.ac_x);
+    imu_ac_buf[ping_buf_idx][1][sample_buf_idx] = float(s.ac_y);
+    imu_ac_buf[ping_buf_idx][2][sample_buf_idx] = float(s.ac_z);
+    imu_ac_buf[ping_buf_idx][3][sample_buf_idx] = float(s.gy_x);
+    imu_ac_buf[ping_buf_idx][4][sample_buf_idx] = float(s.gy_y);
+    imu_ac_buf[ping_buf_idx][5][sample_buf_idx] = float(s.gy_z);
+}
+
+void record_imu_sample(const vel_gyro_s &s)
+{
+    if (next_imu_sample_idx >= IMU_BUF_SIZE)
+    {
+        // toggle buffers
+        current_imu_buffer = (current_imu_buffer + 1) % 2;
+        write_imu_sample(s, current_imu_buffer, IMU_SAMPLE_SIZE - 1);
+        next_imu_sample_idx = IMU_SAMPLE_SIZE;
+    }
+    else if (next_imu_sample_idx >= (IMU_BUF_SIZE - IMU_SAMPLE_SIZE) + 1)
+    {
+        // dual write
+        write_imu_sample(s, current_imu_buffer, next_imu_sample_idx);
+        write_imu_sample(s, (current_imu_buffer + 1) % 2, (next_imu_sample_idx - IMU_BUF_SIZE + IMU_SAMPLE_SIZE - 1));
+        next_imu_sample_idx++;
+    }
+    else
+    {
+        // just write to current
+        write_imu_sample(s, current_imu_buffer, next_imu_sample_idx);
+        next_imu_sample_idx++;
+    }
+}
 
 void *_imu_q_read(void *args)
 {
@@ -56,7 +101,7 @@ void *_imu_q_read(void *args)
     char buffer[IMU_QUEUE_MSGSIZE];
     struct timespec poll_sleep;
     // TODO make size configurable
-    
+
     while (imu_running)
     {
         bytes_read = mq_receive(r_mq, buffer, IMU_QUEUE_MSGSIZE, &prio);
@@ -72,7 +117,8 @@ void *_imu_q_read(void *args)
                 };
                 nanosleep(&del_sleep, NULL);
                 current_pmu = get_mpu_data((int16_t *)imu_buf);
-        //        dump_data(current_pmu);
+                record_imu_sample(current_pmu);
+                //        dump_data(current_pmu);
             }
         }
         else

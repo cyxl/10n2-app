@@ -6,6 +6,7 @@ CAM_SRC_DIR = cam
 AUD_SRC_DIR = aud
 BTN_SRC_DIR = btn
 TF_PI_SRC_DIR = tf_pi
+DP_SRC_DIR = dp
 MENU_HDLR_SRC_DIR = menu_handler
 
 # Command name (Public function 'int <APPNAME>_main(void)' required)
@@ -37,6 +38,7 @@ CFLAGS += -I$(IMU_SRC_DIR)
 CFLAGS += -I$(GNSS_SRC_DIR)
 CFLAGS += -I$(CAM_SRC_DIR)
 CFLAGS += -I$(AUD_SRC_DIR)
+CFLAGS += -I$(DP_SRC_DIR)
 CFLAGS += -I$(BTN_SRC_DIR)
 CFLAGS += -I$(TF_PI_SRC_DIR)
 CFLAGS += -I$(MENU_HDLR_SRC_DIR)
@@ -56,6 +58,7 @@ CXXFLAGS += -I$(AUD_SRC_DIR)
 CXXFLAGS += -I$(CAM_SRC_DIR)
 CXXFLAGS += -I$(BTN_SRC_DIR)
 CXXFLAGS += -I$(TF_PI_SRC_DIR)
+CXXFLAGS += -I$(DP_SRC_DIR)
 CXXFLAGS += -I$(MENU_HDLR_SRC_DIR)
 
 include $(SPRESENSE_HOME)/.vscode/application.mk

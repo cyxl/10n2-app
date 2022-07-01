@@ -25,7 +25,7 @@ static bool menu_handler_running = true;
 static pthread_t menu_handler_th;
 
 struct cam_req cam_c_r = {3, 0,96,96,1,"test"}; //color 3 @ 3hz
-struct cam_req cam_bw_r = {3, 0,96,96,0,"test"}; //color 3 @ 3hz
+struct cam_req cam_bw_r = {2, 0,96,96,0,"test"}; //color 3 @ 3hz
 
 #define CAM_PERIOD 1000
 #define POS_PERIOD 1
@@ -33,7 +33,7 @@ FILE *pos_pf = NULL;
 
 #define POS_SAVE_DIR "/mnt/sd0/pos"
 
-void cycle_pos_fd()
+void close_pos_fd()
 {
     if (pos_pf != NULL)
     {
@@ -45,12 +45,15 @@ void cycle_pos_fd()
         {
             printf("success!  closed pos output file\n");
         }
+        pos_pf = NULL;
     }
-
+}
+void open_pos_fd()
+{
     unsigned curr_time = (unsigned)time(NULL);
     char namebuf[128];
     snprintf(namebuf, 128, "%s/imu-data-%i-%i.%s", POS_SAVE_DIR, current_submenu, curr_time, "csv");
-    printf("saving to :%s\n", namebuf);
+    printf("opening :%s\n", namebuf);
     pos_pf = fopen(namebuf, "wb+");
     if (pos_pf == NULL)
     {
@@ -86,9 +89,13 @@ void update_service(uint8_t last_submenu, uint32_t tick)
     }
     else if (current_menu == pos)
     {
-        if (last_submenu != current_submenu)
+        if (current_submenu > 0 && last_submenu != current_submenu)
         {
-            cycle_pos_fd();
+            open_pos_fd();
+        }
+        if (current_submenu == 0 && last_submenu != current_submenu)
+        {
+            close_pos_fd();
         }
 
         unsigned curr_time = (unsigned)time(NULL);

@@ -92,6 +92,7 @@ void *_btn_q_read(void *args)
         0, (int)(1 * 1e6)
     };
 
+    bool menu_selecting = false;
     while (btn_running)
     {
         int val = board_gpio_read(PIN_PWM0);
@@ -104,13 +105,18 @@ void *_btn_q_read(void *args)
                 // menu toggle
                 printf("menu!\n");
                 toggle_menu();
+                menu_selecting = true;
                 hold_cnt = 0;
             }
         }
         if (val == BTN_UP && last_val == BTN_DOWN)
         {
-            printf("cnt %i\n",hold_cnt);
-            if (hold_cnt <= BTN_REALLY_SHORT_HOLD)
+            printf("cnt %i\n", hold_cnt);
+            if (menu_selecting)
+            {
+                //noop
+            }
+            else if (hold_cnt <= BTN_REALLY_SHORT_HOLD)
             {
                 play_menu_jingle();
             }
@@ -120,6 +126,7 @@ void *_btn_q_read(void *args)
                 printf("submenu!\n");
                 toggle_submenu();
             }
+            menu_selecting = false;
             hold_cnt = 0;
         }
         nanosleep(&del_sleep, NULL);
