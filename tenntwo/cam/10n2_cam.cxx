@@ -32,7 +32,7 @@ static pthread_t cam_th_consumer;
 
 void *_cam_q_read(void *args)
 {
-    
+
     (void)args; /* Suppress -Wunused-parameter warning. */
     /* Initialize the queue attributes */
 
@@ -52,6 +52,7 @@ void *_cam_q_read(void *args)
     ssize_t bytes_read;
     char buffer[CAM_QUEUE_MSGSIZE];
     char namebuf[128];
+    char dirbuf[128];
     struct timespec poll_sleep;
     // TODO make size configurable
 
@@ -62,21 +63,24 @@ void *_cam_q_read(void *args)
         cam_req *r = (cam_req *)buffer;
         if (bytes_read >= 0)
         {
+            camera_init(r->clip_x0, r->clip_y0, r->clip_x1, r->clip_y1);
             unsigned curr_time = (unsigned)time(NULL);
-           // uint32_t bufsize = r->width * r->height * (r->color?2:1);
-            uint16_t width = (r->clip_x1-r->clip_x0); 
+            // uint32_t bufsize = r->width * r->height * (r->color?2:1);
+            uint16_t width = (r->clip_x1 - r->clip_x0);
             uint16_t height = (r->clip_y1 - r->clip_y0);
-            uint32_t bufsize = width * height * (r->color?2:1);
+            uint32_t bufsize = width * height * (r->color ? 2 : 1);
             unsigned char *buf = (unsigned char *)memalign(32, bufsize);
             for (int i = 0; i < r->num; i++)
             {
                 bzero(namebuf, 128);
+                bzero(dirbuf, 128);
                 printf("getting image \n");
-                getimage(buf,r->clip_x0,r->clip_y0,r->clip_x1,r->clip_y1,r->color);
+                getimage(buf, r->clip_x0, r->clip_y0, r->clip_x1, r->clip_y1, r->color);
                 printf("init futil \n");
                 printf("writing image\n");
-                snprintf(namebuf, 128, "%s/%s/tnt-%i-%i-%ix%i.%s", IMG_SAVE_DIR,r->dir, curr_time, i,width,height, r->color?"yuv":"data");
-                if (futil_writeimage(buf, bufsize, namebuf) < 0)
+                snprintf(namebuf, 128, "tnt-%i-%i-%ix%i.%s", curr_time, i, width, height, r->color ? "yuv" : "data");
+                snprintf(dirbuf, 128, "%s/%s", IMG_SAVE_DIR, r->dir);
+                if (futil_writeimage(buf, bufsize, dirbuf, namebuf) < 0)
                 {
                     printf("ERROR creating image \n");
                 }
@@ -86,6 +90,7 @@ void *_cam_q_read(void *args)
                 };
                 nanosleep(&aud_sleep, NULL);
             }
+            camera_teardown();
             free(buf);
         }
         else

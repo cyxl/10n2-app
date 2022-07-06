@@ -86,21 +86,6 @@ static int camera_prepare(enum v4l2_buf_type type,
     return ret;
   }
 
-  /* Prepare video memory to store images */
-
-  frame_mem = (unsigned char *)memalign(32, hsize * vsize * 2);
-  if (!frame_mem)
-  {
-    return -1;
-  }
-
-  clip_mem = (unsigned char *)memalign(32, clip_hsize * clip_vsize * 2);
-  if (!clip_mem)
-  {
-    free(frame_mem);
-    return -1;
-  }
-
   /* VIDIOC_STREAMON start stream */
 
   ret = ioctl(video_fd, VIDIOC_STREAMON, (unsigned long)&type);
@@ -216,8 +201,42 @@ static int init_video(uint16_t clip_hsize, uint16_t clip_vsize)
   return 0;
 }
 
+void camera_init(uint16_t clip_x1, uint16_t clip_y1, uint16_t clip_x2, uint16_t clip_y2)
+{
+  uint16_t hsize = clip_x2 - clip_x1;
+  uint16_t vsize =  clip_y2- clip_y1;
+  camera_alloc(IMAGE_WIDTH, IMAGE_HEIGHT, hsize,vsize);
+}
+
+void camera_teardown()
+{
+  camera_clean();
+}
+
+void camera_alloc(uint16_t hsize, uint16_t vsize,
+                  uint16_t clip_hsize, uint16_t clip_vsize)
+{
+  printf("allocing img %i,%i",hsize,vsize);
+  printf("allocing clip %i,%i",clip_hsize,clip_vsize);
+  /* Prepare video memory to store images */
+
+  frame_mem = (unsigned char *)memalign(32, hsize * vsize * 2);
+  if (!frame_mem)
+  {
+    return -1;
+  }
+
+  clip_mem = (unsigned char *)memalign(32, clip_hsize * clip_vsize * 2);
+  if (!clip_mem)
+  {
+    free(frame_mem);
+    return -1;
+  }
+}
+
 void camera_clean()
 {
+  printf("cleaning img ");
 
   if (frame_mem != NULL)
   {
@@ -240,12 +259,11 @@ int getimage(unsigned char *out_data, uint16_t _x1, uint16_t _y1, uint16_t _x2, 
     .x2 = (IMAGE_WIDTH / 2) + (clip_hsize/2) - 1,
     .y2 = (IMAGE_HEIGHT / 2) + (clip_vsize/2) - 1};
     */
-   const imageproc_rect_t clip_rect = {
-   .x1 = _x1,
-   .y1 = _y1,
-   .x2 = _x2 -1 ,
-   .y2 = _y2 -1  
-   };
+  const imageproc_rect_t clip_rect = {
+      .x1 = _x1,
+      .y1 = _y1,
+      .x2 = _x2 - 1,
+      .y2 = _y2 - 1};
 
   uint16_t clip_hsize = _x2 - _x1;
   uint16_t clip_vsize = _y2 - _y1;
@@ -264,7 +282,7 @@ int getimage(unsigned char *out_data, uint16_t _x1, uint16_t _y1, uint16_t _x2, 
   mem = get_camimage();
   if (mem != NULL)
   {
-    printf("Captured image now. %i %i\n",clip_hsize,clip_vsize);
+    printf("Captured image now. %i %i\n", clip_hsize, clip_vsize);
     if (imageproc_clip_and_resize(mem, IMAGE_WIDTH, IMAGE_HEIGHT,
                                   clip_mem, clip_hsize, clip_vsize,
                                   16 /*YUV422*/, (imageproc_rect_t *)&clip_rect) == 0)
@@ -275,8 +293,9 @@ int getimage(unsigned char *out_data, uint16_t _x1, uint16_t _y1, uint16_t _x2, 
         imageproc_convert_yuv2gray(clip_mem, out_data,
                                    clip_hsize, clip_vsize);
       }
-      else{
-        memcpy(out_data,clip_mem,clip_hsize * clip_vsize * 2);
+      else
+      {
+        memcpy(out_data, clip_mem, clip_hsize * clip_vsize * 2);
       }
       printf("done converting...\n");
       return 0;
@@ -286,7 +305,6 @@ int getimage(unsigned char *out_data, uint16_t _x1, uint16_t _y1, uint16_t _x2, 
       printf("imageproc_clip_and_resize() is failed.\n");
     }
     // undo camera_prepare()
-    camera_clean();
   }
   else
   {

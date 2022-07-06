@@ -25,9 +25,9 @@ static bool menu_handler_running = true;
 
 static pthread_t menu_handler_th;
 
-//struct cam_req cam_c_r = {3, 0,96,96,1,"test"}; //color 3 @ 3hz
-//struct cam_req cam_bw_r = {2, 0,96,96,0,"test"}; //color 3 @ 3hz
-struct cam_req cam_long_bw_r = {2, 0,160,0,320,120,0,"test"}; //color 3 @ 3hz
+struct cam_req cam_hands_bw_r = {2, 0, 160, 0, 320, 120, 0, "hds"};
+struct cam_req cam_cell_bw_r = {2, 0, 160, 0, 320, 120, 0, "cell"};
+struct cam_req cam_none_bw_r = {2, 0, 160, 0, 320, 120, 0, "none"};
 
 #define CAM_PERIOD 100
 #define POS_PERIOD 1
@@ -80,13 +80,23 @@ void update_service(uint8_t last_submenu, uint32_t tick)
     {
         if (current_submenu == cam_color_on)
         {
-       //     if ((tick % CAM_PERIOD) == 0)
-        // TODO       send_cam_req(cam_c_r);
+            //     if ((tick % CAM_PERIOD) == 0)
+            // TODO       send_cam_req(cam_c_r);
         }
-        else if (current_submenu == cam_bw_on)
+        else if (current_submenu == cam_hands_on)
         {
             if ((tick % CAM_PERIOD) == 0)
-                send_cam_req(cam_long_bw_r);
+                send_cam_req(cam_hands_bw_r);
+        }
+        else if (current_submenu == cam_cell_on)
+        {
+            if ((tick % CAM_PERIOD) == 0)
+                send_cam_req(cam_cell_bw_r);
+        }
+        else if (current_submenu == cam_none_on)
+        {
+            if ((tick % CAM_PERIOD) == 0)
+                send_cam_req(cam_none_bw_r);
         }
     }
     else if (current_menu == pos)
@@ -101,7 +111,6 @@ void update_service(uint8_t last_submenu, uint32_t tick)
         }
 
         unsigned curr_time = clock();
-        printf("clock %i\n",curr_time);
         if (current_submenu == imu)
         {
             fprintf(pos_pf, "%i,%i,%i,%i,%i,%i,%i\n",

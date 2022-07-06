@@ -64,13 +64,13 @@ const char *futil_initialize(void)
 
   ret = stat("/mnt/sd0", &stat_buf);
   if (ret < 0)
-    {
-      save_dir = "/mnt/spif";
-    }
+  {
+    save_dir = "/mnt/spif";
+  }
   else
-    {
-      save_dir = "/mnt/sd0";
-    }
+  {
+    save_dir = "/mnt/sd0";
+  }
 
   return save_dir;
 }
@@ -82,28 +82,32 @@ const char *futil_initialize(void)
  *   Write a image file to selected storage.
  ****************************************************************************/
 
-int futil_writeimage(uint8_t *data, size_t len, const char *fullname)
+int futil_writeimage(uint8_t *data, size_t len, const char* dirname, const char *filename)
 {
-  static char s_fname[IMAGE_FILENAME_LEN];
+  char fullname[128];
+  snprintf(fullname,128,"%s/%s",dirname,filename);
+  printf("FILENAME:%s\n", fullname);
 
   FILE *fp;
 
+  struct stat st = {0};
 
-  printf("FILENAME:%s\n", fullname);
-
+  if (stat(dirname, &st) == -1)
+  {
+    mkdir(dirname,0777);
+  }
   fp = fopen(fullname, "wb");
   if (NULL == fp)
-    {
-      printf("fopen error : %d\n", errno);
-      return -1;
-    }
+  {
+    printf("fopen error : %d\n", errno);
+    return -1;
+  }
 
   if (len != fwrite(data, 1, len, fp))
-    {
-      printf("fwrite error : %d\n", errno);
-    }
+  {
+    printf("fwrite error : %d\n", errno);
+  }
 
   fclose(fp);
   return 0;
 }
-

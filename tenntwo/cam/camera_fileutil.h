@@ -41,7 +41,7 @@ const char *futil_initialize(void);
 
 /* Write an image file */
 
-int futil_writeimage(uint8_t *data, size_t len, const char *fullname);
+int futil_writeimage(uint8_t *data, size_t len, const char* dirname, const char *filename);
 
 #ifdef __cplusplus
 }
