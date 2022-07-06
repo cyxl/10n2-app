@@ -10,8 +10,10 @@ struct cam_req
 {
     int8_t num;
     int16_t delay;
-    uint16_t width;
-    uint16_t height;
+    uint16_t clip_x0;
+    uint16_t clip_y0;
+    uint16_t clip_x1;
+    uint16_t clip_y1;
     bool color;
     char dir[5];
 };

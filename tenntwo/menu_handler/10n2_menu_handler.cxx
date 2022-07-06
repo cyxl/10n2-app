@@ -13,6 +13,7 @@
 #include <arch/board/board.h>
 
 #include <imu.h>
+#include <nuttx/clock.h>
 #include <10n2_menu_handler.h>
 #include <10n2_imu.h>
 #include <10n2_aud.h>
@@ -24,10 +25,11 @@ static bool menu_handler_running = true;
 
 static pthread_t menu_handler_th;
 
-struct cam_req cam_c_r = {3, 0,96,96,1,"test"}; //color 3 @ 3hz
-struct cam_req cam_bw_r = {2, 0,96,96,0,"test"}; //color 3 @ 3hz
+//struct cam_req cam_c_r = {3, 0,96,96,1,"test"}; //color 3 @ 3hz
+//struct cam_req cam_bw_r = {2, 0,96,96,0,"test"}; //color 3 @ 3hz
+struct cam_req cam_long_bw_r = {2, 0,160,0,320,120,0,"test"}; //color 3 @ 3hz
 
-#define CAM_PERIOD 1000
+#define CAM_PERIOD 100
 #define POS_PERIOD 1
 FILE *pos_pf = NULL;
 
@@ -50,7 +52,7 @@ void close_pos_fd()
 }
 void open_pos_fd()
 {
-    unsigned curr_time = (unsigned)time(NULL);
+    unsigned curr_time = clock();
     char namebuf[128];
     snprintf(namebuf, 128, "%s/imu-data-%i-%i.%s", POS_SAVE_DIR, current_submenu, curr_time, "csv");
     printf("opening :%s\n", namebuf);
@@ -78,13 +80,13 @@ void update_service(uint8_t last_submenu, uint32_t tick)
     {
         if (current_submenu == cam_color_on)
         {
-            if ((tick % CAM_PERIOD) == 0)
-                send_cam_req(cam_c_r);
+       //     if ((tick % CAM_PERIOD) == 0)
+        // TODO       send_cam_req(cam_c_r);
         }
         else if (current_submenu == cam_bw_on)
         {
             if ((tick % CAM_PERIOD) == 0)
-                send_cam_req(cam_bw_r);
+                send_cam_req(cam_long_bw_r);
         }
     }
     else if (current_menu == pos)
@@ -98,7 +100,8 @@ void update_service(uint8_t last_submenu, uint32_t tick)
             close_pos_fd();
         }
 
-        unsigned curr_time = (unsigned)time(NULL);
+        unsigned curr_time = clock();
+        printf("clock %i\n",curr_time);
         if (current_submenu == imu)
         {
             fprintf(pos_pf, "%i,%i,%i,%i,%i,%i,%i\n",
@@ -164,7 +167,7 @@ void *_menu_run(void *args)
     uint32_t tick = 0;
     while (menu_handler_running)
     {
-        update_service(last_submenu, tick);
+        update_service(last_submenu, tick++);
         last_menu = current_menu;
         last_submenu = current_submenu;
         nanosleep(&del_sleep, NULL);

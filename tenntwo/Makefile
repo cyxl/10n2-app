@@ -8,6 +8,7 @@ BTN_SRC_DIR = btn
 TF_PI_SRC_DIR = tf_pi
 DP_SRC_DIR = dp
 MENU_HDLR_SRC_DIR = menu_handler
+UTIL_SRC_DIR = util
 
 # Command name (Public function 'int <APPNAME>_main(void)' required)
 APPNAME = 
@@ -42,6 +43,7 @@ CFLAGS += -I$(DP_SRC_DIR)
 CFLAGS += -I$(BTN_SRC_DIR)
 CFLAGS += -I$(TF_PI_SRC_DIR)
 CFLAGS += -I$(MENU_HDLR_SRC_DIR)
+CFLAGS += -I$(UTIL_SRC_DIR)
 
 CFLAGS += -I$(TOPDIR)/arch/arm/src/cxd56xx/
 
@@ -59,6 +61,7 @@ CXXFLAGS += -I$(CAM_SRC_DIR)
 CXXFLAGS += -I$(BTN_SRC_DIR)
 CXXFLAGS += -I$(TF_PI_SRC_DIR)
 CXXFLAGS += -I$(DP_SRC_DIR)
+CXXFLAGS += -I$(UTIL_SRC_DIR)
 CXXFLAGS += -I$(MENU_HDLR_SRC_DIR)
 
 include $(SPRESENSE_HOME)/.vscode/application.mk

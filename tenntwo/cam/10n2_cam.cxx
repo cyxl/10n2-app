@@ -63,16 +63,19 @@ void *_cam_q_read(void *args)
         if (bytes_read >= 0)
         {
             unsigned curr_time = (unsigned)time(NULL);
-            uint32_t bufsize = r->width * r->height * (r->color?2:1);
+           // uint32_t bufsize = r->width * r->height * (r->color?2:1);
+            uint16_t width = (r->clip_x1-r->clip_x0); 
+            uint16_t height = (r->clip_y1 - r->clip_y0);
+            uint32_t bufsize = width * height * (r->color?2:1);
             unsigned char *buf = (unsigned char *)memalign(32, bufsize);
             for (int i = 0; i < r->num; i++)
             {
                 bzero(namebuf, 128);
                 printf("getting image \n");
-                getimage(buf,r->width,r->height,r->color);
+                getimage(buf,r->clip_x0,r->clip_y0,r->clip_x1,r->clip_y1,r->color);
                 printf("init futil \n");
                 printf("writing image\n");
-                snprintf(namebuf, 128, "%s/%s/tnt-%i-%i-%ix%i.%s", IMG_SAVE_DIR,r->dir, curr_time, i,r->width,r->height, r->color?"yuv":"data");
+                snprintf(namebuf, 128, "%s/%s/tnt-%i-%i-%ix%i.%s", IMG_SAVE_DIR,r->dir, curr_time, i,width,height, r->color?"yuv":"data");
                 if (futil_writeimage(buf, bufsize, namebuf) < 0)
                 {
                     printf("ERROR creating image \n");

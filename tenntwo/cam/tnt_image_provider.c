@@ -230,15 +230,25 @@ void camera_clean()
     clip_mem = NULL;
   }
 }
-int getimage(unsigned char *out_data, uint16_t clip_hsize, uint16_t clip_vsize, bool color)
+int getimage(unsigned char *out_data, uint16_t _x1, uint16_t _y1, uint16_t _x2, uint16_t _y2, bool color)
 {
   unsigned char *mem;
+  /*
   const imageproc_rect_t clip_rect = {
     .x1 = (IMAGE_WIDTH / 2) - (clip_hsize/2),
     .y1 = (IMAGE_HEIGHT / 2) - (clip_vsize/2),
     .x2 = (IMAGE_WIDTH / 2) + (clip_hsize/2) - 1,
     .y2 = (IMAGE_HEIGHT / 2) + (clip_vsize/2) - 1};
+    */
+   const imageproc_rect_t clip_rect = {
+   .x1 = _x1,
+   .y1 = _y1,
+   .x2 = _x2 -1 ,
+   .y2 = _y2 -1  
+   };
 
+  uint16_t clip_hsize = _x2 - _x1;
+  uint16_t clip_vsize = _y2 - _y1;
   if (init_video(clip_hsize, clip_vsize) < 0)
   {
     printf("init_video() is faled..\n");
@@ -254,7 +264,7 @@ int getimage(unsigned char *out_data, uint16_t clip_hsize, uint16_t clip_vsize, 
   mem = get_camimage();
   if (mem != NULL)
   {
-    printf("Captured image now.\n");
+    printf("Captured image now. %i %i\n",clip_hsize,clip_vsize);
     if (imageproc_clip_and_resize(mem, IMAGE_WIDTH, IMAGE_HEIGHT,
                                   clip_mem, clip_hsize, clip_vsize,
                                   16 /*YUV422*/, (imageproc_rect_t *)&clip_rect) == 0)
