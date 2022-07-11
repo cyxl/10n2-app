@@ -102,6 +102,26 @@ static struct aud_req btn_submenu_4_j[BTN_SUBMENU_4_J_LEN] = {
 static struct aud_req btn_err_j[BTN_ERR_J_LEN] = {
   {1,DEF_VOLUME,300,400}, {0,255,0,0}, //off
 };
+
+#define TF_CELL_J_LEN 4
+static struct aud_req tf_cell_j[TF_CELL_J_LEN] = {
+  {1,DEF_VOLUME,200,40}, {0,255,0,0}, //off
+  {1,DEF_VOLUME,200,40}, {0,255,0,0}, //off
+};
+#define TF_HANDS_J_LEN 4
+static struct aud_req tf_hands_j[TF_HANDS_J_LEN] = {
+  {1,DEF_VOLUME,1800,40}, {0,255,0,0}, //off
+  {1,DEF_VOLUME,1800,40}, {0,255,0,0}, //off
+};
+#define TF_NONE_J_LEN 4
+static struct aud_req tf_none_j[TF_NONE_J_LEN] = {
+  {1,DEF_VOLUME,900,40}, {0,255,0,0}, //off
+  {1,DEF_VOLUME,900,40}, {0,255,0,0}, //off
+};
+
+
+
+
 bool aud_init(void);
 
 bool aud_teardown(void);

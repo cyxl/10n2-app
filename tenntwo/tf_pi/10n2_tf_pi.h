@@ -8,7 +8,7 @@ extern "C" {
 
 
 #include <stdint.h>
-struct tf_pi_req{
+struct tf_req{
     uint32_t num;
     int16_t delay;
 };
@@ -16,7 +16,7 @@ struct tf_pi_req{
 bool tf_pi_init(void);
 bool tf_pi_teardown(void);
 
-bool send_tf_pi_req(struct tf_pi_req req);
+bool send_tf_req(struct tf_req req);
 #ifdef __cplusplus
 }
 #endif

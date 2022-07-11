@@ -27,21 +27,21 @@ int tenntwo_main(int argc, char *argv[])
 
   tf_pi_init();
   struct cam_req cam_r = {5, 1000};
-  //  struct imu_req imu_r = {1e6, 50}; //TODO 5000 total secs.
+  struct imu_req imu_r = {1e6, 50}; //TODO 5000 total secs.
   struct gnss_req gnss_r = {10, 100};
-  struct tf_pi_req tf_pi_r = {50, 1000};
-  // cam_init();
-  // imu_init();
-  // gnss_init();
-  // aud_init();
-  // btn_init();
-  // dp_init();
-  // menu_handler_init();
+  struct tf_req tf_r = {500, 1200};
+   cam_init();
+   imu_init();
+   gnss_init();
+   aud_init();
+   btn_init();
+   dp_init();
+   menu_handler_init();
 
-  // send_aud_seq(startup_jingle, STARTUP_JINGLE_LEN);
+   send_aud_seq(startup_jingle, STARTUP_JINGLE_LEN);
 
   //nxsig_usleep(10 * 1e6); /* usecs (arbitrary) */
-  //send_tf_pi_req(tf_pi_r);
+  send_tf_req(tf_r);
 
   //  send_imu_req(imu_r);
   //  send_cam_req(cam_r);
@@ -61,6 +61,7 @@ int tenntwo_main(int argc, char *argv[])
   menu_handler_teardown();
   aud_teardown();
   btn_teardown();
+  tf_pi_teardown();
 
   return 0;
 }

@@ -30,8 +30,7 @@ static bool cam_running = true;
 static struct mq_attr cam_attr_mq = CAM_QUEUE_ATTR_INITIALIZER;
 static pthread_t cam_th_consumer;
 
-unsigned char* latest_img_buf = nullptr;
-
+unsigned char *latest_img_buf = nullptr;
 
 void *_cam_q_read(void *args)
 {
@@ -81,12 +80,15 @@ void *_cam_q_read(void *args)
                 printf("getting image \n");
                 getimage(buf, r->clip_x0, r->clip_y0, r->clip_x1, r->clip_y1, r->color);
                 printf("init futil \n");
-                printf("writing image\n");
-                snprintf(namebuf, 128, "tnt-%i-%i-%ix%i.%s", curr_time, i, width, height, r->color ? "yuv" : "data");
-                snprintf(dirbuf, 128, "%s/%s", IMG_SAVE_DIR, r->dir);
-                if (futil_writeimage(buf, bufsize, dirbuf, namebuf) < 0)
+                if (strlen(r->dir) > 0)
                 {
-                    printf("ERROR creating image \n");
+                    printf("writing image\n");
+                    snprintf(namebuf, 128, "tnt-%i-%i-%ix%i.%s", curr_time, i, width, height, r->color ? "yuv" : "data");
+                    snprintf(dirbuf, 128, "%s/%s", IMG_SAVE_DIR, r->dir);
+                    if (futil_writeimage(buf, bufsize, dirbuf, namebuf) < 0)
+                    {
+                        printf("ERROR creating image \n");
+                    }
                 }
                 struct timespec aud_sleep
                 {

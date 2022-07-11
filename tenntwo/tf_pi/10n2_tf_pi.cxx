@@ -3,8 +3,12 @@
 // standard includes
 #include <stdio.h>
 #include <10n2_tf_pi.h>
-//#include <10n2_cam.h>
-//#include "test_data.h"
+#include <pthread.h>
+#include <mqueue.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <10n2_cam.h>
+#include <10n2_aud.h>
 
 // EI Includes
 #include "tflite-resolver.h"
@@ -20,6 +24,23 @@
 #include "tensorflow/lite/micro/all_ops_resolver.h"
 
 #include <test_data.h>
+
+static bool tf_running = true;
+#define TF_QUEUE_NAME "/tf_queue" /* Queue name. */
+#define TF_QUEUE_PERMS ((int)(0644))
+#define TF_QUEUE_MAXMSG 16              /* Maximum number of messages. */
+#define TF_QUEUE_MSGSIZE sizeof(tf_req) /* Length of message. */
+#define TF_QUEUE_ATTR_INITIALIZER ((struct mq_attr){TF_QUEUE_MAXMSG, TF_QUEUE_MSGSIZE, 0, 0})
+
+#define TF_QUEUE_POLL ((struct timespec){0, 100000000})
+
+
+#define CELL_CONF .7 
+#define HANDS_CONF .7
+#define NONE_CONF .7
+
+static struct mq_attr tf_attr_mq = TF_QUEUE_ATTR_INITIALIZER;
+static pthread_t tf_th_consumer;
 
 // Globals
 static TfLiteTensor *input = nullptr;
@@ -55,7 +76,7 @@ int8_t quantize(uint8_t pixel_grayscale)
 
 int8_t slow_quantize(uint8_t pixel_grayscale)
 {
-    //since grayscale, only 1 value needed
+    // since grayscale, only 1 value needed
     float g = static_cast<float>(pixel_grayscale) / 255.0f;
 
     // ITU-R 601-2 luma transform
@@ -105,64 +126,108 @@ bool model_init(void)
     printf("after input  type %i \n", input->type);
     printf("after input  size %i \n", input->bytes);
 
-    int8_t *d = tflite::GetTensorData<int8>(input);
-    int8_t *od = tflite::GetTensorData<int8>(output);
+    return true;
+}
 
-    for (int i=0;i<160 * 120;i++)
+void *_tf_thread(void *args)
+{
+    (void)args; /* Suppress -Wunused-parameter warning. */
+    /* Initialize the queue attributes */
+
+    /* Create the message queue. The queue reader is NONBLOCK. */
+    mqd_t r_mq = mq_open(TF_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, TF_QUEUE_PERMS, &tf_attr_mq);
+    if (r_mq < 0)
     {
-        d[i] = quantize(none_test_data[i] & 0xff); //We only need first byte, bytes 1-3 all the same for gray 
+        fprintf(stderr, "[TF CONSUMER]: Error, cannot open the queue: %s.\n", strerror(errno));
+        return NULL;
     }
-    // Run the model on this input and make sure it succeeds.
-    if (kTfLiteOk != interpreter->Invoke())
+
+    printf("[TF CONSUMER]: Queue opened, queue descriptor: %d.\n", r_mq);
+
+    unsigned int prio;
+    ssize_t bytes_read;
+    char buffer[TF_QUEUE_MSGSIZE];
+    struct timespec poll_sleep;
+
+    while (tf_running)
     {
-        printf("TF invoke failure!!!\n");
-        TF_LITE_REPORT_ERROR(er, "Invoke failed.");
+        bytes_read = mq_receive(r_mq, buffer, TF_QUEUE_MSGSIZE, &prio);
+        tf_req *r = (tf_req *)buffer;
+        if (bytes_read >= 0)
+        {
+            for (int i = 0; i < r->num && tf_running; i++)
+            {
+                int8_t *d = tflite::GetTensorData<int8>(input);
+                int8_t *od = tflite::GetTensorData<int8>(output);
+
+                for (int i = 0; i < 160 * 120; i++)
+                {
+                    //d[i] = quantize(cell_test_data[i] & 0xff); // We only need first byte, bytes 1-3 all the same for gray
+                    d[i] = quantize(latest_img_buf[i]); 
+                }
+                // Run the model on this input and make sure it succeeds.
+                if (kTfLiteOk != interpreter->Invoke())
+                {
+                    printf("TF invoke failure!!!\n");
+                    TF_LITE_REPORT_ERROR(er, "Invoke failed.");
+                    continue;
+                }
+                printf("done with invoke!\n");
+
+                for (int j = 0; j < 3; j++)
+                {
+                    float res = (od[j] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE;
+                    printf("cell res %i : %f\n", j, res);
+                }
+
+
+                if ((od[0] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE>CELL_CONF)
+                {
+                    send_aud_seq(tf_cell_j,TF_CELL_J_LEN);
+                }
+                if ((od[1] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE>HANDS_CONF)
+                {
+                    send_aud_seq(tf_hands_j,TF_HANDS_J_LEN);
+                }
+                if ((od[2] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE>NONE_CONF)
+                {
+                    send_aud_seq(tf_none_j,TF_NONE_J_LEN);
+                }
+
+                struct timespec del_sleep
+                {
+                    r->delay / 1000, (r->delay % 1000) * 1e6
+                };
+                nanosleep(&del_sleep, NULL);
+            }
+        }
+        else
+        {
+            poll_sleep = TF_QUEUE_POLL;
+            nanosleep(&poll_sleep, NULL);
+        }
+
+        fflush(stdout);
+    }
+    printf("tf cleaning mq\n");
+    mq_close(r_mq);
+    return NULL;
+}
+
+bool send_tf_req(struct tf_req req)
+{
+    mqd_t mq = mq_open(TF_QUEUE_NAME, O_WRONLY);
+    if (mq < 0)
+    {
+        fprintf(stderr, "[tf sender]: Error, cannot open the queue: %s.\n", strerror(errno));
         return false;
     }
-    printf("done with invoke!\n");
-
-    for (int j=0;j<3;j++)
+    if (mq_send(mq, (char *)&req, TF_QUEUE_MSGSIZE, 1) < 0)
     {
-        float res = (od[j] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE;
-        printf ("none res %i : %f\n",j,res);
-    }
-    for (int i=0;i<160 * 120;i++)
-    {
-        d[i] = quantize(hands_test_data[i] & 0xff); //We only need first byte, bytes 1-3 all the same for gray 
-    }
-    // Run the model on this input and make sure it succeeds.
-    if (kTfLiteOk != interpreter->Invoke())
-    {
-        printf("TF invoke failure!!!\n");
-        TF_LITE_REPORT_ERROR(er, "Invoke failed.");
-        return false;
-    }
-    printf("done with invoke!\n");
-
-    for (int j=0;j<3;j++)
-    {
-        float res = (od[j] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE;
-        printf ("hands res %i : %f\n",j,res);
-    }
-    for (int i=0;i<160 * 120;i++)
-    {
-        d[i] = quantize(cell_test_data[i] & 0xff); //We only need first byte, bytes 1-3 all the same for gray 
-    }
-    // Run the model on this input and make sure it succeeds.
-    if (kTfLiteOk != interpreter->Invoke())
-    {
-        printf("TF invoke failure!!!\n");
-        TF_LITE_REPORT_ERROR(er, "Invoke failed.");
-        return false;
-    }
-    printf("done with invoke!\n");
-
-    for (int j=0;j<3;j++)
-    {
-        float res = (od[j] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE;
-        printf ("cell res %i : %f\n",j,res);
+        fprintf(stderr, "[tf sender]: Error, cannot send: %i, %s.\n", errno, strerror(errno));
     }
 
+    mq_close(mq);
     return true;
 }
 bool tf_pi_init(void)
@@ -170,11 +235,15 @@ bool tf_pi_init(void)
     printf("tf pi init\n");
     model_init();
     printf("done model init\n");
+    tf_running = true;
+    pthread_create(&tf_th_consumer, NULL, &_tf_thread, NULL);
     return true;
 }
 
 bool tf_pi_teardown(void)
 {
     printf("tf pi teardown\n");
+    tf_running = false;
+    pthread_join(tf_th_consumer, NULL);
     return true;
 }

@@ -28,6 +28,7 @@ static pthread_t menu_handler_th;
 struct cam_req cam_hands_bw_r = {2, 0, 160, 0, 320, 120, 0, "hds"};
 struct cam_req cam_cell_bw_r = {2, 0, 160, 0, 320, 120, 0, "cell"};
 struct cam_req cam_none_bw_r = {2, 0, 160, 0, 320, 120, 0, "none"};
+struct cam_req cam_nowrite_bw_r = {2, 0, 160, 0, 320, 120, 0, ""};
 
 #define CAM_PERIOD 100
 #define POS_PERIOD 1
@@ -78,6 +79,11 @@ void update_service(uint8_t last_submenu, uint32_t tick)
 {
     if (current_menu == img)
     {
+        if (current_submenu == cam_bw_on)
+        {
+            if ((tick % CAM_PERIOD) == 0)
+                send_cam_req(cam_nowrite_bw_r);
+        }
         if (current_submenu == cam_color_on)
         {
             //     if ((tick % CAM_PERIOD) == 0)
