@@ -7,6 +7,7 @@ extern "C" {
 #endif
 
 
+#include <stdint.h>
 struct tf_pi_req{
     uint32_t num;
     int16_t delay;

@@ -2,6 +2,7 @@
 .depend
 .built
 *.o
+*.d
 *.dep
 
 out/

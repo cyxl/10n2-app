@@ -14,7 +14,7 @@
 #include <sys/stat.h>
 #include <10n2_dp.h>
 #include <10n2_imu.h>
-#include <arm_math.h>
+//BWS#include <arm_math.h>
 
 static bool dp_running = true;
 
@@ -27,12 +27,14 @@ void *_dp_run(void *args)
 
     // TODO make size configurable
     struct timespec poll_sleep = {0, 100000000};
+    /*
     float32_t acx_r;
     float32_t acy_r;
     float32_t acz_r;
     float32_t gyx_r;
     float32_t gyy_r;
     float32_t gyz_r;
+    */
 
     while (dp_running)
     {
@@ -46,12 +48,14 @@ void *_dp_run(void *args)
         float* gyz = get_latest_imu_samples(5);
         if (acx != NULL) 
         {
+            /*
             arm_mean_f32(acx, IMU_SAMPLE_SIZE, &acx_r);
             arm_mean_f32(acy, IMU_SAMPLE_SIZE, &acy_r);
             arm_mean_f32(acz, IMU_SAMPLE_SIZE, &acz_r);
             arm_mean_f32(gyx, IMU_SAMPLE_SIZE, &gyx_r);
             arm_mean_f32(gyy, IMU_SAMPLE_SIZE, &gyy_r);
             arm_mean_f32(gyz, IMU_SAMPLE_SIZE, &gyz_r);
+            */
 
         }
         //printf("means %f,%f,%f,%f,%f,%f\n",acx_r, acy_r, acz_r, gyx_r, gyy_r, gyz_r);

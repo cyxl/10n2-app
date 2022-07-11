@@ -1,130 +1,180 @@
 
 
-/****************************************************************************
- * Included Files
- ****************************************************************************/
-
+// standard includes
 #include <stdio.h>
-#include <stdlib.h>
-#include <pthread.h>
-#include <mqueue.h>
-#include <sys/types.h>
-#include <fcntl.h>
-#include <time.h>
-#include <debug_log_callback.h>
-#include <main_functions.h>
 #include <10n2_tf_pi.h>
+//#include <10n2_cam.h>
+//#include "test_data.h"
 
-static bool tf_pi_running = true;
-#define TF_PI_QUEUE_NAME "/tf_pi_queue" /* Queue name. */
-#define TF_PI_QUEUE_PERMS ((int)(0644))
-#define TF_PI_QUEUE_MAXMSG 16                 /* Maximum number of messages. */
-#define TF_PI_QUEUE_MSGSIZE sizeof(tf_pi_req) /* Length of message. */
-#define TF_PI_QUEUE_ATTR_INITIALIZER ((struct mq_attr){TF_PI_QUEUE_MAXMSG, TF_PI_QUEUE_MSGSIZE, 0, 0})
+// EI Includes
+#include "tflite-resolver.h"
+#include "tflite-trained.h"
+#include "model_metadata.h"
 
-#define TF_PI_QUEUE_POLL ((struct timespec){0, 100000000})
+// TF Includes
+#include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
+#include "tensorflow/lite/micro/micro_error_reporter.h"
+#include "tensorflow/lite/schema/schema_generated.h"
+#include "tensorflow/lite/micro/micro_interpreter.h"
+#include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
+#include "tensorflow/lite/micro/all_ops_resolver.h"
 
-#define TF_PI_SAVE_DIR "/mnt/sd0"
-static struct mq_attr tf_pi_attr_mq = TF_PI_QUEUE_ATTR_INITIALIZER;
-static pthread_t tf_pi_th_consumer;
+#include <test_data.h>
 
-static void test_log_printf(const char *s)
+// Globals
+static TfLiteTensor *input = nullptr;
+static TfLiteTensor *output = nullptr;
+static tflite::ErrorReporter *er = new tflite::MicroErrorReporter();
+
+// Globals, used for compatibility with Arduino-style sketches.
+namespace
 {
-    printf("bws %s ", s);
+    const tflite::Model *model = nullptr;
+    tflite::MicroInterpreter *interpreter = nullptr;
+    const uint32_t tnt_arena_size = EI_CLASSIFIER_TFLITE_ARENA_SIZE;
+    static uint8_t tnt_tensor_arena[tnt_arena_size];
+} // namespace
+
+int8_t quantize(uint8_t pixel_grayscale)
+{
+    static const int32_t iRedToGray = (int32_t)(0.299f * 65536.0f);
+    static const int32_t iGreenToGray = (int32_t)(0.587f * 65536.0f);
+    static const int32_t iBlueToGray = (int32_t)(0.114f * 65536.0f);
+
+    // ITU-R 601-2 luma transform
+    // see: https://pillow.readthedocs.io/en/stable/reference/Image.html#PIL.Image.Image.convert
+    int32_t gray = (iRedToGray * pixel_grayscale) + (iGreenToGray * pixel_grayscale) + (iBlueToGray * pixel_grayscale);
+    gray >>= 16; // scale down to int8_t
+    gray += EI_CLASSIFIER_TFLITE_INPUT_ZEROPOINT;
+    if (gray < -128)
+        gray = -128;
+    else if (gray > 127)
+        gray = 127;
+    return static_cast<int8_t>(gray);
 }
 
-void *_tf_pi_q_read(void *args)
+int8_t slow_quantize(uint8_t pixel_grayscale)
 {
+    //since grayscale, only 1 value needed
+    float g = static_cast<float>(pixel_grayscale) / 255.0f;
 
-    RegisterDebugLogCallback(test_log_printf);
-    setup();
-    (void)args; /* Suppress -Wunused-parameter warning. */
-    /* Initialize the queue attributes */
-
-    /* Create the message queue. The queue reader is NONBLOCK. */
-    mqd_t r_mq = mq_open(TF_PI_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, TF_PI_QUEUE_PERMS, &tf_pi_attr_mq);
-    char tf_pi_buf[sizeof(tf_pi_req)];
-
-    if (r_mq < 0)
-    {
-        fprintf(stderr, "[CONSUMER]: Error, cannot open the queue: %s.\n", strerror(errno));
-        return NULL;
-    }
-
-    printf("[CONSUMER]: Queue opened, queue descriptor: %d.\n", r_mq);
-
-    unsigned int prio;
-    ssize_t bytes_read;
-    char buffer[TF_PI_QUEUE_MSGSIZE];
-    struct timespec poll_sleep;
-    // TODO make size configurable
-
-    while (tf_pi_running)
-    {
-        bytes_read = mq_receive(r_mq, buffer, TF_PI_QUEUE_MSGSIZE, &prio);
-        tf_pi_req *r = (tf_pi_req *)buffer;
-        if (bytes_read >= 0)
-        {
-            for (int i = 0; i < r->num; i++)
-            {
-                loop();
-                struct timespec del_sleep
-                {
-                    r->delay / 1000, (r->delay % 1000) * 1e6
-                };
-                nanosleep(&del_sleep, NULL);
-            }
-        }
-        else
-        {
-            poll_sleep = TF_PI_QUEUE_POLL;
-            nanosleep(&poll_sleep, NULL);
-        }
-
-        fflush(stdout);
-    }
-    printf("TF PI cleaning mq\n");
-    mq_close(r_mq);
-    // mq_unlink(TF_PI_QUEUE_NAME);
-    return NULL;
+    // ITU-R 601-2 luma transform
+    // see: https://pillow.readthedocs.io/en/stable/reference/Image.html#PIL.Image.Image.convert
+    float v = (0.299f * g) + (0.587f * g) + (0.114f * g);
+    return static_cast<int8_t>((int8_t)(v / EI_CLASSIFIER_TFLITE_INPUT_SCALE + .5) + EI_CLASSIFIER_TFLITE_INPUT_ZEROPOINT);
 }
 
-bool send_tf_pi_req(struct tf_pi_req req)
+bool model_init(void)
 {
-    mqd_t mq = mq_open(TF_PI_QUEUE_NAME, O_WRONLY);
-    if (mq < 0)
+
+    model = tflite::GetModel(trained_tflite);
+    printf("after getmodel %d \n", model->version());
+
+    if (model->version() != 3)
     {
-        fprintf(stderr, "[sender]: Error, cannot open the queue: %s.\n", strerror(errno));
+        TF_LITE_REPORT_ERROR(er,
+                             "Model provided is schema version %d not equal "
+                             "to supported version %d.",
+                             model->version(), 3);
         return false;
     }
-    if (mq_send(mq, (char *)&req, TF_PI_QUEUE_MSGSIZE, 1) < 0)
+
+    static tflite::AllOpsResolver resolver;
+    // EI_TFLITE_RESOLVER
+    printf("after resolver \n");
+
+    interpreter = new tflite::MicroInterpreter(model, resolver, tnt_tensor_arena, tnt_arena_size, er);
+
+    // Allocate memory from the tensor_arena for the model's tensors.
+    TfLiteStatus allocate_status = interpreter->AllocateTensors();
+    printf("after alloc\n");
+
+    if (allocate_status != kTfLiteOk)
     {
-        fprintf(stderr, "[sender]: Error, cannot send: %i, %s.\n", errno, strerror(errno));
+        printf("TF alloc failure!!!\n");
+        TF_LITE_REPORT_ERROR(er, "AllocateTensors() failed");
+        return false;
     }
 
-    mq_close(mq);
+    // Get information about the memory area to use for the model's input.
+    printf("before input \n");
+    input = interpreter->input(0);
+    output = interpreter->output(0);
+    printf("after input  scale %f \n", input->params.scale);
+    printf("after input  zero_point %i \n", input->params.zero_point);
+    printf("after input  type %i \n", input->type);
+    printf("after input  size %i \n", input->bytes);
+
+    int8_t *d = tflite::GetTensorData<int8>(input);
+    int8_t *od = tflite::GetTensorData<int8>(output);
+
+    for (int i=0;i<160 * 120;i++)
+    {
+        d[i] = quantize(none_test_data[i] & 0xff); //We only need first byte, bytes 1-3 all the same for gray 
+    }
+    // Run the model on this input and make sure it succeeds.
+    if (kTfLiteOk != interpreter->Invoke())
+    {
+        printf("TF invoke failure!!!\n");
+        TF_LITE_REPORT_ERROR(er, "Invoke failed.");
+        return false;
+    }
+    printf("done with invoke!\n");
+
+    for (int j=0;j<3;j++)
+    {
+        float res = (od[j] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE;
+        printf ("none res %i : %f\n",j,res);
+    }
+    for (int i=0;i<160 * 120;i++)
+    {
+        d[i] = quantize(hands_test_data[i] & 0xff); //We only need first byte, bytes 1-3 all the same for gray 
+    }
+    // Run the model on this input and make sure it succeeds.
+    if (kTfLiteOk != interpreter->Invoke())
+    {
+        printf("TF invoke failure!!!\n");
+        TF_LITE_REPORT_ERROR(er, "Invoke failed.");
+        return false;
+    }
+    printf("done with invoke!\n");
+
+    for (int j=0;j<3;j++)
+    {
+        float res = (od[j] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE;
+        printf ("hands res %i : %f\n",j,res);
+    }
+    for (int i=0;i<160 * 120;i++)
+    {
+        d[i] = quantize(cell_test_data[i] & 0xff); //We only need first byte, bytes 1-3 all the same for gray 
+    }
+    // Run the model on this input and make sure it succeeds.
+    if (kTfLiteOk != interpreter->Invoke())
+    {
+        printf("TF invoke failure!!!\n");
+        TF_LITE_REPORT_ERROR(er, "Invoke failed.");
+        return false;
+    }
+    printf("done with invoke!\n");
+
+    for (int j=0;j<3;j++)
+    {
+        float res = (od[j] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE;
+        printf ("cell res %i : %f\n",j,res);
+    }
+
     return true;
 }
-
 bool tf_pi_init(void)
 {
     printf("tf pi init\n");
-    tf_pi_running = true;
-    pthread_attr_t attr;
-    pthread_attr_init(&attr);
-    if (0 != pthread_attr_setstacksize(&attr, 32768))
-    {
-        printf("Error setting stack size\n");
-    }
-    pthread_create(&tf_pi_th_consumer, &attr, &_tf_pi_q_read, NULL);
-
+    model_init();
+    printf("done model init\n");
     return true;
 }
 
 bool tf_pi_teardown(void)
 {
     printf("tf pi teardown\n");
-    tf_pi_running = false;
-    pthread_join(tf_pi_th_consumer, NULL);
     return true;
 }

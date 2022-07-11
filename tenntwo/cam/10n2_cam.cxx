@@ -30,6 +30,9 @@ static bool cam_running = true;
 static struct mq_attr cam_attr_mq = CAM_QUEUE_ATTR_INITIALIZER;
 static pthread_t cam_th_consumer;
 
+unsigned char* latest_img_buf = nullptr;
+
+
 void *_cam_q_read(void *args)
 {
 
@@ -70,6 +73,7 @@ void *_cam_q_read(void *args)
             uint16_t height = (r->clip_y1 - r->clip_y0);
             uint32_t bufsize = width * height * (r->color ? 2 : 1);
             unsigned char *buf = (unsigned char *)memalign(32, bufsize);
+            latest_img_buf = buf;
             for (int i = 0; i < r->num; i++)
             {
                 bzero(namebuf, 128);

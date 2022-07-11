@@ -23,6 +23,7 @@ bool send_cam_req(struct cam_req req);
 bool cam_init(void);
 bool cam_teardown(void);
 
+extern unsigned char* latest_img_buf;
 #ifdef __cplusplus
 }
 #endif
