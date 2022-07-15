@@ -23,8 +23,6 @@
 #include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
 #include "tensorflow/lite/micro/all_ops_resolver.h"
 
-#include <test_data.h>
-
 static bool tf_running = true;
 #define TF_QUEUE_NAME "/tf_queue" /* Queue name. */
 #define TF_QUEUE_PERMS ((int)(0644))
@@ -34,10 +32,10 @@ static bool tf_running = true;
 
 #define TF_QUEUE_POLL ((struct timespec){0, 100000000})
 
-
-#define CELL_CONF .7 
+#define CELL_CONF .7
 #define HANDS_CONF .7
 #define NONE_CONF .7
+#define INF_CONF .4
 
 static struct mq_attr tf_attr_mq = TF_QUEUE_ATTR_INITIALIZER;
 static pthread_t tf_th_consumer;
@@ -46,6 +44,10 @@ static pthread_t tf_th_consumer;
 static TfLiteTensor *input = nullptr;
 static TfLiteTensor *output = nullptr;
 static tflite::ErrorReporter *er = new tflite::MicroErrorReporter();
+
+#define CELL_IDX 0
+#define HANDS_IDX 1
+#define NONE_IDX 2
 
 // Globals, used for compatibility with Arduino-style sketches.
 namespace
@@ -89,7 +91,6 @@ bool model_init(void)
 {
 
     model = tflite::GetModel(trained_tflite);
-    printf("after getmodel %d \n", model->version());
 
     if (model->version() != 3)
     {
@@ -102,17 +103,15 @@ bool model_init(void)
 
     static tflite::AllOpsResolver resolver;
     // EI_TFLITE_RESOLVER
-    printf("after resolver \n");
 
     interpreter = new tflite::MicroInterpreter(model, resolver, tnt_tensor_arena, tnt_arena_size, er);
 
     // Allocate memory from the tensor_arena for the model's tensors.
     TfLiteStatus allocate_status = interpreter->AllocateTensors();
-    printf("after alloc\n");
 
     if (allocate_status != kTfLiteOk)
     {
-        printf("TF alloc failure!!!\n");
+        printf("TF alloc failure :%i!!!\n",allocate_status);
         TF_LITE_REPORT_ERROR(er, "AllocateTensors() failed");
         return false;
     }
@@ -148,6 +147,7 @@ void *_tf_thread(void *args)
     ssize_t bytes_read;
     char buffer[TF_QUEUE_MSGSIZE];
     struct timespec poll_sleep;
+    static const int num_classes = 3;
 
     while (tf_running)
     {
@@ -160,11 +160,14 @@ void *_tf_thread(void *args)
                 int8_t *d = tflite::GetTensorData<int8>(input);
                 int8_t *od = tflite::GetTensorData<int8>(output);
 
-                for (int i = 0; i < 160 * 120; i++)
+                cam_wait();
+                //for (int i = 0; i < 160 * 120; i++)
+                for (int img_idx = 0; img_idx < 96 * 96; img_idx++)
                 {
-                    //d[i] = quantize(cell_test_data[i] & 0xff); // We only need first byte, bytes 1-3 all the same for gray
-                    d[i] = quantize(latest_img_buf[i]); 
+                    // d[i] = quantize(cell_test_data[i] & 0xff); // We only need first byte, bytes 1-3 all the same for gray
+                    d[img_idx] = slow_quantize(latest_img_buf[img_idx]);
                 }
+                cam_release();
                 // Run the model on this input and make sure it succeeds.
                 if (kTfLiteOk != interpreter->Invoke())
                 {
@@ -172,26 +175,37 @@ void *_tf_thread(void *args)
                     TF_LITE_REPORT_ERROR(er, "Invoke failed.");
                     continue;
                 }
-                printf("done with invoke!\n");
 
-                for (int j = 0; j < 3; j++)
+                for (int j = 0; j < num_classes; j++)
                 {
                     float res = (od[j] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE;
-                    printf("cell res %i : %f\n", j, res);
+                    printf("inf res %i : %f\n", j, res);
                 }
 
+                float max_conf = 0;
+                int max_idx = -1;
 
-                if ((od[0] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE>CELL_CONF)
+                for (int k = 0; k < num_classes; k++)
                 {
-                    send_aud_seq(tf_cell_j,TF_CELL_J_LEN);
+                    float conf = 0.;
+                    conf = (od[k] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE;
+                    if (conf > max_conf)
+                    {
+                        max_conf = conf;
+                        max_idx = k;
+                    }
                 }
-                if ((od[1] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE>HANDS_CONF)
+
+                printf("infs %f %f %d", max_conf, max_idx);
+                if (max_conf >= INF_CONF)
                 {
-                    send_aud_seq(tf_hands_j,TF_HANDS_J_LEN);
-                }
-                if ((od[2] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE>NONE_CONF)
-                {
-                    send_aud_seq(tf_none_j,TF_NONE_J_LEN);
+
+                    if (max_idx == CELL_IDX)
+                        send_aud_seq(tf_cell_j, TF_CELL_J_LEN);
+                    else if (max_idx == HANDS_IDX)
+                        send_aud_seq(tf_hands_j, TF_HANDS_J_LEN);
+                    else if (max_idx == NONE_IDX)
+                        send_aud_seq(tf_none_j, TF_NONE_J_LEN);
                 }
 
                 struct timespec del_sleep

@@ -25,26 +25,22 @@ int tenntwo_main(int argc, char *argv[])
   printf("TNT start\n");
   boardctl(BOARDIOC_INIT, 0);
 
-  tf_pi_init();
-  struct cam_req cam_r = {5, 1000};
-  struct imu_req imu_r = {1e6, 50}; //TODO 5000 total secs.
+  struct cam_req cam_nowrite_bw_r = {2, 0, 160, 0, 320, 120, 0, ""};
+  struct imu_req imu_r = {1e6, 50}; // TODO 5000 total secs.
   struct gnss_req gnss_r = {10, 100};
-  struct tf_req tf_r = {500, 1200};
-   cam_init();
-   imu_init();
-   gnss_init();
-   aud_init();
-   btn_init();
-   dp_init();
-   menu_handler_init();
+  struct tf_req tf_r = {500, 1000};
+  cam_init();
+  imu_init();
+  gnss_init();
+  aud_init();
+  btn_init();
+  dp_init();
+  tf_pi_init();
+  menu_handler_init();
 
-   send_aud_seq(startup_jingle, STARTUP_JINGLE_LEN);
-
-  //nxsig_usleep(10 * 1e6); /* usecs (arbitrary) */
-  send_tf_req(tf_r);
+  send_aud_seq(startup_jingle, STARTUP_JINGLE_LEN);
 
   //  send_imu_req(imu_r);
-  //  send_cam_req(cam_r);
   while (1)
   {
     //   send_gnss_req(gnss_r);

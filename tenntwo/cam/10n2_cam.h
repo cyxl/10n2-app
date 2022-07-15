@@ -22,7 +22,8 @@ bool send_cam_req(struct cam_req req);
 
 bool cam_init(void);
 bool cam_teardown(void);
-
+bool cam_wait(void);
+bool cam_release(void);
 extern unsigned char* latest_img_buf;
 #ifdef __cplusplus
 }

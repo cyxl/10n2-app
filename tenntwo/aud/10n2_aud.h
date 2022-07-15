@@ -73,6 +73,14 @@ static struct aud_req btn_menu_3_j[BTN_MENU_3_J_LEN] = {
   {1,DEF_VOLUME,700,150}, {0,255,0,0}, //off
 };
 
+#define BTN_MENU_4_J_LEN 8 
+static struct aud_req btn_menu_4_j[BTN_MENU_4_J_LEN] = {
+  {1,DEF_VOLUME,700,150}, {0,255,0,40}, //off
+  {1,DEF_VOLUME,700,150}, {0,255,0,40}, //off
+  {1,DEF_VOLUME,700,150}, {0,255,0,0}, //off
+  {1,DEF_VOLUME,700,150}, {0,255,0,0}, //off
+};
+
 #define BTN_SUBMENU_1_J_LEN 2
 static struct aud_req btn_submenu_1_j[BTN_SUBMENU_1_J_LEN] = {
   {1,DEF_VOLUME,900,100}, {0,255,0,0}, //off
@@ -98,15 +106,22 @@ static struct aud_req btn_submenu_4_j[BTN_SUBMENU_4_J_LEN] = {
   {1,DEF_VOLUME,900,100}, {0,255,0,0}, //off
   {1,DEF_VOLUME,900,100}, {0,255,0,0}, //off
 };
+#define BTN_SUBMENU_5_J_LEN 10
+static struct aud_req btn_submenu_5_j[BTN_SUBMENU_5_J_LEN] = {
+  {1,DEF_VOLUME,900,100}, {0,255,0,20}, //off
+  {1,DEF_VOLUME,900,100}, {0,255,0,20}, //off
+  {1,DEF_VOLUME,900,100}, {0,255,0,0}, //off
+  {1,DEF_VOLUME,900,100}, {0,255,0,0}, //off
+  {1,DEF_VOLUME,900,100}, {0,255,0,0}, //off
+};
 #define BTN_ERR_J_LEN 2
 static struct aud_req btn_err_j[BTN_ERR_J_LEN] = {
   {1,DEF_VOLUME,300,400}, {0,255,0,0}, //off
 };
 
-#define TF_CELL_J_LEN 4
+#define TF_CELL_J_LEN 2
 static struct aud_req tf_cell_j[TF_CELL_J_LEN] = {
-  {1,DEF_VOLUME,200,40}, {0,255,0,0}, //off
-  {1,DEF_VOLUME,200,40}, {0,255,0,0}, //off
+  {1,DEF_VOLUME,200,80}, {0,255,0,0}, //off
 };
 #define TF_HANDS_J_LEN 4
 static struct aud_req tf_hands_j[TF_HANDS_J_LEN] = {
@@ -115,8 +130,13 @@ static struct aud_req tf_hands_j[TF_HANDS_J_LEN] = {
 };
 #define TF_NONE_J_LEN 4
 static struct aud_req tf_none_j[TF_NONE_J_LEN] = {
-  {1,DEF_VOLUME,900,40}, {0,255,0,0}, //off
-  {1,DEF_VOLUME,900,40}, {0,255,0,0}, //off
+  {1,DEF_VOLUME,500,40}, {0,255,0,0}, //off
+  {1,DEF_VOLUME,500,40}, {0,255,0,0}, //off
+};
+
+#define CAM_CAPTURE_J_LEN 2
+static struct aud_req cam_cap_j[CAM_CAPTURE_J_LEN] = {
+  {1,DEF_VOLUME,1900,10}, {0,255,0,0}, //off
 };
 
 

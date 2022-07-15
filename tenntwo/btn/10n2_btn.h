@@ -11,6 +11,7 @@ enum tnt_menu{
     top = 0,
     pos,
     img,
+    inf,
     num_menu
 };
 
@@ -40,6 +41,11 @@ enum tnt_img_menu{
     cam_color_on,
 };
 
+enum tnt_inf_menu{
+    inf_off=0,
+    inf_on,
+    num_inf_menu,  //TODO 
+};
 extern uint8_t current_menu;
 extern uint8_t current_submenu;
 

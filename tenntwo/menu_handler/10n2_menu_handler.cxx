@@ -20,17 +20,20 @@
 #include <10n2_btn.h>
 #include <10n2_cam.h>
 #include <10n2_gnss.h>
+#include <10n2_tf_pi.h>
 
 static bool menu_handler_running = true;
 
 static pthread_t menu_handler_th;
 
-struct cam_req cam_hands_bw_r = {2, 0, 160, 0, 320, 120, 0, "hds"};
-struct cam_req cam_cell_bw_r = {2, 0, 160, 0, 320, 120, 0, "cell"};
-struct cam_req cam_none_bw_r = {2, 0, 160, 0, 320, 120, 0, "none"};
-struct cam_req cam_nowrite_bw_r = {2, 0, 160, 0, 320, 120, 0, ""};
+struct cam_req cam_hands_bw_r = {2, 0, 192, 12, 288, 108, 0, "hds"};
+struct cam_req cam_cell_bw_r = {2, 0, 192, 12, 288, 108, 0, "cell"};
+struct cam_req cam_none_bw_r = {2, 0, 192, 12, 288, 108, 0, "none"};
+struct cam_req cam_nowrite_bw_r = {1, 0, 192, 12, 288, 108, 0, ""};
+struct tf_req inf_r = {1, 0};
 
-#define CAM_PERIOD 100
+#define CAM_PERIOD 25
+#define INF_PERIOD 25
 #define POS_PERIOD 1
 FILE *pos_pf = NULL;
 
@@ -163,6 +166,17 @@ void update_service(uint8_t last_submenu, uint32_t tick)
                     current_gnss.type,
                     current_gnss.latitude,
                     current_gnss.longitude);
+        }
+    }
+    else if (current_menu == inf)
+    {
+        if (current_submenu == inf_on)
+        {
+            if ((tick % INF_PERIOD) == 0)
+            {
+                send_cam_req(cam_nowrite_bw_r);
+                send_tf_req(inf_r);
+            }
         }
     }
 }

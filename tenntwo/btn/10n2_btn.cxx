@@ -43,6 +43,10 @@ void play_menu_jingle()
     {
         send_aud_seq(btn_menu_3_j, BTN_MENU_3_J_LEN);
     }
+    else if (current_menu == inf)
+    {
+        send_aud_seq(btn_menu_4_j, BTN_MENU_4_J_LEN);
+    }
 
     if ((int)current_submenu == 0)
         send_aud_seq(btn_submenu_1_j, BTN_SUBMENU_1_J_LEN);
@@ -52,6 +56,8 @@ void play_menu_jingle()
         send_aud_seq(btn_submenu_3_j, BTN_SUBMENU_3_J_LEN);
     else if ((int)current_submenu == 3)
         send_aud_seq(btn_submenu_4_j, BTN_SUBMENU_4_J_LEN);
+    else if ((int)current_submenu == 4)
+        send_aud_seq(btn_submenu_5_j, BTN_SUBMENU_5_J_LEN);
     else
         send_aud_seq(btn_err_j, BTN_ERR_J_LEN);
 }
@@ -76,6 +82,10 @@ void toggle_submenu()
     else if (current_menu == img)
     {
         current_submenu = (current_submenu + 1) % num_img_menu;
+    }
+    else if (current_menu == inf)
+    {
+        current_submenu = (current_submenu + 1) % num_inf_menu;
     }
     play_menu_jingle();
 }

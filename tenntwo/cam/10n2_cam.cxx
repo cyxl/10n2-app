@@ -14,6 +14,7 @@
 #include <arch/chip/audio.h>
 
 #include <10n2_cam.h>
+#include <10n2_aud.h>
 #include <tnt_image_provider.h>
 #include <camera_fileutil.h>
 
@@ -31,6 +32,7 @@ static struct mq_attr cam_attr_mq = CAM_QUEUE_ATTR_INITIALIZER;
 static pthread_t cam_th_consumer;
 
 unsigned char *latest_img_buf = nullptr;
+pthread_mutex_t cam_mutex;
 
 void *_cam_q_read(void *args)
 {
@@ -44,11 +46,11 @@ void *_cam_q_read(void *args)
 
     if (r_mq < 0)
     {
-        fprintf(stderr, "[CONSUMER]: Error, cannot open the queue: %s.\n", strerror(errno));
+        fprintf(stderr, "[cam CONSUMER]: Error, cannot open the queue: %s.\n", strerror(errno));
         return NULL;
     }
 
-    printf("[CONSUMER]: Queue opened, queue descriptor: %d.\n", r_mq);
+    printf("[cam CONSUMER]: Queue opened, queue descriptor: %d.\n", r_mq);
 
     unsigned int prio;
     ssize_t bytes_read;
@@ -78,8 +80,12 @@ void *_cam_q_read(void *args)
                 bzero(namebuf, 128);
                 bzero(dirbuf, 128);
                 printf("getting image \n");
+                cam_wait();
+                printf("done waiting\n");
                 getimage(buf, r->clip_x0, r->clip_y0, r->clip_x1, r->clip_y1, r->color);
-                printf("init futil \n");
+                cam_release();
+                send_aud_seq(cam_cap_j, CAM_CAPTURE_J_LEN);
+
                 if (strlen(r->dir) > 0)
                 {
                     printf("writing image\n");
@@ -118,12 +124,12 @@ bool send_cam_req(struct cam_req req)
     mqd_t mq = mq_open(CAM_QUEUE_NAME, O_WRONLY);
     if (mq < 0)
     {
-        fprintf(stderr, "[sender]: Error, cannot open the queue: %s.\n", strerror(errno));
+        fprintf(stderr, "[cam sender]: Error, cannot open the queue: %s.\n", strerror(errno));
         return false;
     }
     if (mq_send(mq, (char *)&req, CAM_QUEUE_MSGSIZE, 1) < 0)
     {
-        fprintf(stderr, "[sender]: Error, cannot send: %i, %s.\n", errno, strerror(errno));
+        fprintf(stderr, "[cam sender]: Error, cannot send: %i, %s.\n", errno, strerror(errno));
     }
 
     mq_close(mq);
@@ -135,6 +141,11 @@ bool cam_init(void)
     printf("bws cam init\n");
     cam_running = true;
     pthread_create(&cam_th_consumer, NULL, &_cam_q_read, NULL);
+    if (0 != (errno = pthread_mutex_init(&cam_mutex, NULL)))
+    {
+        perror("pthread_mutex_init() failed");
+        return EXIT_FAILURE;
+    }
     return true;
 }
 
@@ -144,4 +155,13 @@ bool cam_teardown(void)
     cam_running = false;
     pthread_join(cam_th_consumer, NULL);
     return true;
+}
+
+bool cam_wait(void)
+{
+    return 0 == pthread_mutex_lock(&cam_mutex);
+}
+bool cam_release(void)
+{
+    return 0 == pthread_mutex_unlock(&cam_mutex);
 }

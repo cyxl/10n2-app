@@ -216,8 +216,6 @@ void camera_teardown()
 void camera_alloc(uint16_t hsize, uint16_t vsize,
                   uint16_t clip_hsize, uint16_t clip_vsize)
 {
-  printf("allocing img %i,%i",hsize,vsize);
-  printf("allocing clip %i,%i",clip_hsize,clip_vsize);
   /* Prepare video memory to store images */
 
   frame_mem = (unsigned char *)memalign(32, hsize * vsize * 2);
@@ -236,7 +234,6 @@ void camera_alloc(uint16_t hsize, uint16_t vsize,
 
 void camera_clean()
 {
-  printf("cleaning img ");
 
   if (frame_mem != NULL)
   {
@@ -287,7 +284,6 @@ int getimage(unsigned char *out_data, uint16_t _x1, uint16_t _y1, uint16_t _x2, 
                                   clip_mem, clip_hsize, clip_vsize,
                                   16 /*YUV422*/, (imageproc_rect_t *)&clip_rect) == 0)
     {
-      printf("converting...\n");
       if (!color)
       {
         imageproc_convert_yuv2gray(clip_mem, out_data,
@@ -297,7 +293,6 @@ int getimage(unsigned char *out_data, uint16_t _x1, uint16_t _y1, uint16_t _x2, 
       {
         memcpy(out_data, clip_mem, clip_hsize * clip_vsize * 2);
       }
-      printf("done converting...\n");
       return 0;
     }
     else
