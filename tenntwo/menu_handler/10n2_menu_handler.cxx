@@ -32,8 +32,8 @@ struct cam_req cam_none_bw_r = {2, 0, 192, 12, 288, 108, 0, "none"};
 struct cam_req cam_nowrite_bw_r = {1, 0, 192, 12, 288, 108, 0, ""};
 struct tf_req inf_r = {1, 0};
 
-#define CAM_PERIOD 25
-#define INF_PERIOD 25
+#define CAM_PERIOD 45
+#define INF_PERIOD 45
 #define POS_PERIOD 1
 FILE *pos_pf = NULL;
 

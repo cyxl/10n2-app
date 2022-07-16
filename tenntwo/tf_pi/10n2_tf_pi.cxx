@@ -30,7 +30,7 @@ static bool tf_running = true;
 #define TF_QUEUE_MSGSIZE sizeof(tf_req) /* Length of message. */
 #define TF_QUEUE_ATTR_INITIALIZER ((struct mq_attr){TF_QUEUE_MAXMSG, TF_QUEUE_MSGSIZE, 0, 0})
 
-#define TF_QUEUE_POLL ((struct timespec){0, 100000000})
+#define TF_QUEUE_POLL ((struct timespec){0, 10000000})
 
 #define CELL_CONF .7
 #define HANDS_CONF .7
@@ -111,7 +111,7 @@ bool model_init(void)
 
     if (allocate_status != kTfLiteOk)
     {
-        printf("TF alloc failure :%i!!!\n",allocate_status);
+        printf("TF alloc failure :%i!!!\n", allocate_status);
         TF_LITE_REPORT_ERROR(er, "AllocateTensors() failed");
         return false;
     }
@@ -155,20 +155,24 @@ void *_tf_thread(void *args)
         tf_req *r = (tf_req *)buffer;
         if (bytes_read >= 0)
         {
+            int8_t *d = tflite::GetTensorData<int8>(input);
+            int8_t *od = tflite::GetTensorData<int8>(output);
+            struct timespec del_sleep
+            {
+                r->delay / 1000, (r->delay % 1000) * 1e6
+            };
             for (int i = 0; i < r->num && tf_running; i++)
             {
-                int8_t *d = tflite::GetTensorData<int8>(input);
-                int8_t *od = tflite::GetTensorData<int8>(output);
 
-                cam_wait();
-                //for (int i = 0; i < 160 * 120; i++)
+                 cam_wait();
+                // for (int i = 0; i < 160 * 120; i++)
                 for (int img_idx = 0; img_idx < 96 * 96; img_idx++)
                 {
                     // d[i] = quantize(cell_test_data[i] & 0xff); // We only need first byte, bytes 1-3 all the same for gray
-                    d[img_idx] = slow_quantize(latest_img_buf[img_idx]);
+                    d[img_idx] = quantize(latest_img_buf[img_idx]);
                 }
-                cam_release();
-                // Run the model on this input and make sure it succeeds.
+                 cam_release();
+                //  Run the model on this input and make sure it succeeds.
                 if (kTfLiteOk != interpreter->Invoke())
                 {
                     printf("TF invoke failure!!!\n");
@@ -208,10 +212,6 @@ void *_tf_thread(void *args)
                         send_aud_seq(tf_none_j, TF_NONE_J_LEN);
                 }
 
-                struct timespec del_sleep
-                {
-                    r->delay / 1000, (r->delay % 1000) * 1e6
-                };
                 nanosleep(&del_sleep, NULL);
             }
         }
