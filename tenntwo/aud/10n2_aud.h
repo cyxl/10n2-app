@@ -141,42 +141,42 @@ static struct aud_req cam_cap_j[CAM_CAPTURE_J_LEN] = {
   
 #define SHARP_TURN_J_LEN 8
 static struct aud_req sharp_turn_j[SHARP_TURN_J_LEN] = {
-  {1,DEF_VOLUME,1800,100}, {0,255,0,0},
-  {1,DEF_VOLUME,1800,100}, {0,255,0,0},
-  {1,DEF_VOLUME,300,100}, {0,255,0,0},
-  {1,DEF_VOLUME,300,100}, {0,255,0,0},
+  {1,DEF_VOLUME,1800,50},
+  {1,DEF_VOLUME,1800,50},
+  {1,DEF_VOLUME,300,50},
+  {1,DEF_VOLUME,300,50}, {0,255,0,0},
 };
   
 #define DECELERATION_J_LEN 10
-static struct aud_req sharp_turn_j[SHARP_TURN_J_LEN] = {
-  {1,DEF_VOLUME,1500,100}, {0,255,0,0},
-  {1,DEF_VOLUME,1200,100}, {0,255,0,0},
-  {1,DEF_VOLUME,900,100}, {0,255,0,0},
-  {1,DEF_VOLUME,600,100}, {0,255,0,0},
-  {1,DEF_VOLUME,300,100}, {0,255,0,0},
+static struct aud_req deceleration_j_len[DECELERATION_J_LEN] = {
+  {1,DEF_VOLUME,1500,50}, 
+  {1,DEF_VOLUME,1200,50}, 
+  {1,DEF_VOLUME,900,50}, 
+  {1,DEF_VOLUME,600,50}, 
+  {1,DEF_VOLUME,300,50}, {0,255,0,0},
 };
 
 #define ACCELERATION_J_LEN 10
-static struct aud_req sharp_turn_j[SHARP_TURN_J_LEN] = {
-  {1,DEF_VOLUME,300,100}, {0,255,0,0},
-  {1,DEF_VOLUME,600,100}, {0,255,0,0},
-  {1,DEF_VOLUME,900,100}, {0,255,0,0},
-  {1,DEF_VOLUME,1200,100}, {0,225,0,0},
-  {1,DEF_VOLUME,1500,100}, {0,225,0,0},
-};
-  
-#define PHONE_J_LEN 6
-static struct aud_req btn_submenu_3_j[BTN_SUBMENU_3_J_LEN] = {
-  {1,DEF_VOLUME,1500,100}, {0,225,0,0},
-  {1,DEF_VOLUME,300,100}, {0,255,0,0},
-  {1,DEF_VOLUME,1500,100}, {0,225,0,0},
+static struct aud_req acceleration_j_len[ACCELERATION_J_LEN] = {
+  {1,DEF_VOLUME,300,50},
+  {1,DEF_VOLUME,600,50},
+  {1,DEF_VOLUME,900,50},
+  {1,DEF_VOLUME,1200,50},
+  {1,DEF_VOLUME,1500,50}, {0,225,0,0},
 };
   
 #define NO_HANDS_J_LEN 6
-static struct aud_req btn_submenu_3_j[BTN_SUBMENU_3_J_LEN] = {
-  {1,DEF_VOLUME,300,100}, {0,255,0,0},
-  {1,DEF_VOLUME,1500,100}, {0,225,0,0},
-  {1,DEF_VOLUME,300,100}, {0,255,0,0},
+static struct aud_req no_hands_j_len[NO_HANDS_J_LEN] = {
+  {1,DEF_VOLUME,1500,50},
+  {1,DEF_VOLUME,300,50},
+  {1,DEF_VOLUME,1500,50}, {0,225,0,0},
+};
+  
+#define PHONE_J_LEN 6
+static struct aud_req phone_j_len[PHONE_J_LEN] = {
+  {1,DEF_VOLUME,300,50},
+  {1,DEF_VOLUME,1500,50},
+  {1,DEF_VOLUME,300,50}, {0,255,0,0},
 };
 
 bool aud_init(void);
