@@ -16,15 +16,20 @@ struct aud_req
   uint32_t dur; // milli
 };
 
-#define STARTUP_JINGLE_LEN 5
+#define STARTUP_JINGLE_LEN 10
 #define DEF_VOLUME -20
 
 static struct aud_req startup_jingle[STARTUP_JINGLE_LEN] = {
-  {1,DEF_VOLUME,400,100},
-  {1,DEF_VOLUME,500,100},
-  {1,DEF_VOLUME,600,100},
-  {1,DEF_VOLUME,600,100},
-  {1,DEF_VOLUME,300,100},
+  {1,DEF_VOLUME,400,10},
+  {1,DEF_VOLUME,500,10},
+  {1,DEF_VOLUME,600,10},
+  {1,DEF_VOLUME,600,10},
+  {1,DEF_VOLUME,300,10},
+  {1,DEF_VOLUME,300,10},
+  {1,DEF_VOLUME,600,10},
+  {1,DEF_VOLUME,600,10},
+  {1,DEF_VOLUME,500,10},
+  {1,DEF_VOLUME,400,10},
 };
 
 #define SHUTDOWN_JINGLE_LEN 5

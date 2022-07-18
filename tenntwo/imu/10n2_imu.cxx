@@ -118,7 +118,7 @@ void *_imu_q_read(void *args)
                 nanosleep(&del_sleep, NULL);
                 current_pmu = get_mpu_data((int16_t *)imu_buf);
                 record_imu_sample(current_pmu);
-                //        dump_data(current_pmu);
+                        //dump_data(current_pmu);
             }
         }
         else

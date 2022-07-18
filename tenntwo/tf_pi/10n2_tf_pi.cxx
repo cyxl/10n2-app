@@ -165,20 +165,24 @@ void *_tf_thread(void *args)
             {
 
                  cam_wait();
+                 printf("b4 quant\n");
                 // for (int i = 0; i < 160 * 120; i++)
                 for (int img_idx = 0; img_idx < 96 * 96; img_idx++)
                 {
                     // d[i] = quantize(cell_test_data[i] & 0xff); // We only need first byte, bytes 1-3 all the same for gray
                     d[img_idx] = quantize(latest_img_buf[img_idx]);
                 }
+                 printf("aft quant\n");
                  cam_release();
                 //  Run the model on this input and make sure it succeeds.
+                 printf("b4 invoke\n");
                 if (kTfLiteOk != interpreter->Invoke())
                 {
                     printf("TF invoke failure!!!\n");
                     TF_LITE_REPORT_ERROR(er, "Invoke failed.");
                     continue;
                 }
+                 printf("aft invoke\n");
 
                 for (int j = 0; j < num_classes; j++)
                 {

@@ -14,12 +14,49 @@
 #include <sys/stat.h>
 #include <10n2_dp.h>
 #include <10n2_imu.h>
-//BWS#include <arm_math.h>
+// BWS#include <arm_math.h>
 
 static bool dp_running = true;
 
 static pthread_t dp_th_consumer;
 
+float sum(float *vals, uint8_t num)
+{
+    float ret = 0.;
+    for (int i = 0; i < num; i++)
+        ret += vals[i];
+    return ret;
+}
+
+void product(float *x, float *y, float *res, uint8_t num)
+{
+    for (int i = 0; i < num; i++)
+        res[i] = x[i] * y[i];
+}
+
+void sqr(float *x, float *res, uint8_t num)
+{
+    for (int i = 0; i < num; i++)
+        res[i] = x[i] * x[i];
+}
+
+static float x_vals[IMU_SAMPLE_SIZE]; 
+float get_slope(float* vals,uint8_t size)
+{
+    // TODO lock
+    float xy_prods[size];
+    float x_sqrs[size];
+    float xsum;
+    float ysum;
+    product(x_vals,vals,xy_prods,size);
+    xsum = sum(x_vals,size);
+    ysum = sum(vals,size);
+    sqr(x_vals,x_sqrs,size);
+
+    return ((size * sum(xy_prods,size)) - (xsum * ysum)) / 
+           ((size * sum(x_sqrs,size))-(xsum*xsum));
+
+}
 void *_dp_run(void *args)
 {
     (void)args; /* Suppress -Wunused-parameter warning. */
@@ -40,25 +77,14 @@ void *_dp_run(void *args)
     {
         nanosleep(&poll_sleep, NULL);
 
-        float* acx = get_latest_imu_samples(0);
-        float* acy = get_latest_imu_samples(1);
-        float* acz = get_latest_imu_samples(2);
-        float* gyx = get_latest_imu_samples(3);
-        float* gyy = get_latest_imu_samples(4);
-        float* gyz = get_latest_imu_samples(5);
-        if (acx != NULL) 
-        {
-            /*
-            arm_mean_f32(acx, IMU_SAMPLE_SIZE, &acx_r);
-            arm_mean_f32(acy, IMU_SAMPLE_SIZE, &acy_r);
-            arm_mean_f32(acz, IMU_SAMPLE_SIZE, &acz_r);
-            arm_mean_f32(gyx, IMU_SAMPLE_SIZE, &gyx_r);
-            arm_mean_f32(gyy, IMU_SAMPLE_SIZE, &gyy_r);
-            arm_mean_f32(gyz, IMU_SAMPLE_SIZE, &gyz_r);
-            */
-
-        }
-        //printf("means %f,%f,%f,%f,%f,%f\n",acx_r, acy_r, acz_r, gyx_r, gyy_r, gyz_r);
+        float *acx = get_latest_imu_samples(0);
+        float *acy = get_latest_imu_samples(1);
+        float *acz = get_latest_imu_samples(2);
+        float x_slope = get_slope(acx,IMU_SAMPLE_SIZE);
+        float y_slope = get_slope(acy,IMU_SAMPLE_SIZE);
+        float z_slope = get_slope(acz,IMU_SAMPLE_SIZE);
+        printf("slope %f %f %f\n",x_slope,y_slope,z_slope);
+        // printf("means %f,%f,%f,%f,%f,%f\n",acx_r, acy_r, acz_r, gyx_r, gyy_r, gyz_r);
     }
     printf("dp done!\n");
     return NULL;
@@ -70,6 +96,8 @@ bool dp_init(void)
     dp_running = true;
     pthread_create(&dp_th_consumer, NULL, &_dp_run, NULL);
 
+    for (int i=1;i<=IMU_SAMPLE_SIZE;i++)
+       x_vals[i] = (float)i; 
     return true;
 }
 

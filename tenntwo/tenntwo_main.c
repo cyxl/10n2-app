@@ -26,7 +26,7 @@ int tenntwo_main(int argc, char *argv[])
   boardctl(BOARDIOC_INIT, 0);
 
   struct cam_req cam_nowrite_bw_r = {2, 0, 160, 0, 320, 120, 0, ""};
-  struct imu_req imu_r = {1e6, 50}; // TODO 5000 total secs.
+  struct imu_req imu_r = {1e6, 100}; // TODO 5000 total secs.
   struct gnss_req gnss_r = {10, 100};
   struct tf_req tf_r = {500, 1000};
   cam_init();
@@ -40,7 +40,7 @@ int tenntwo_main(int argc, char *argv[])
 
   send_aud_seq(startup_jingle, STARTUP_JINGLE_LEN);
 
-  //  send_imu_req(imu_r);
+  send_imu_req(imu_r);
   while (1)
   {
     //   send_gnss_req(gnss_r);
