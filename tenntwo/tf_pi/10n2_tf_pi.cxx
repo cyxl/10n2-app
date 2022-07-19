@@ -7,6 +7,7 @@
 #include <mqueue.h>
 #include <sys/types.h>
 #include <fcntl.h>
+#include <nuttx/clock.h>
 #include <10n2_cam.h>
 #include <10n2_aud.h>
 
@@ -37,7 +38,11 @@ static bool tf_running = true;
 #define NONE_CONF .7
 #define INF_CONF .4
 
-static struct mq_attr tf_attr_mq = TF_QUEUE_ATTR_INITIALIZER;
+uint8_t current_inf = TF_UNKNOWN;
+float current_conf = 0.;
+uint32_t current_time_tf = 0;
+
+struct mq_attr tf_attr_mq = TF_QUEUE_ATTR_INITIALIZER;
 static pthread_t tf_th_consumer;
 
 // Globals
@@ -117,13 +122,8 @@ bool model_init(void)
     }
 
     // Get information about the memory area to use for the model's input.
-    printf("before input \n");
     input = interpreter->input(0);
     output = interpreter->output(0);
-    printf("after input  scale %f \n", input->params.scale);
-    printf("after input  zero_point %i \n", input->params.zero_point);
-    printf("after input  type %i \n", input->type);
-    printf("after input  size %i \n", input->bytes);
 
     return true;
 }
@@ -164,30 +164,26 @@ void *_tf_thread(void *args)
             for (int i = 0; i < r->num && tf_running; i++)
             {
 
-                 cam_wait();
-                 printf("b4 quant\n");
+                cam_wait();
                 // for (int i = 0; i < 160 * 120; i++)
                 for (int img_idx = 0; img_idx < 96 * 96; img_idx++)
                 {
                     // d[i] = quantize(cell_test_data[i] & 0xff); // We only need first byte, bytes 1-3 all the same for gray
                     d[img_idx] = quantize(latest_img_buf[img_idx]);
                 }
-                 printf("aft quant\n");
-                 cam_release();
+                cam_release();
                 //  Run the model on this input and make sure it succeeds.
-                 printf("b4 invoke\n");
                 if (kTfLiteOk != interpreter->Invoke())
                 {
                     printf("TF invoke failure!!!\n");
                     TF_LITE_REPORT_ERROR(er, "Invoke failed.");
                     continue;
                 }
-                 printf("aft invoke\n");
 
                 for (int j = 0; j < num_classes; j++)
                 {
                     float res = (od[j] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE;
-                    printf("inf res %i : %f\n", j, res);
+                //    printf("inf res %i : %f\n", j, res);
                 }
 
                 float max_conf = 0;
@@ -205,15 +201,20 @@ void *_tf_thread(void *args)
                 }
 
                 printf("infs %f %f %d", max_conf, max_idx);
-                if (max_conf >= INF_CONF)
-                {
+                current_conf = max_conf;
+                current_time_tf = clock();
 
-                    if (max_idx == CELL_IDX)
-                        send_aud_seq(tf_cell_j, TF_CELL_J_LEN);
-                    else if (max_idx == HANDS_IDX)
-                        send_aud_seq(tf_hands_j, TF_HANDS_J_LEN);
-                    else if (max_idx == NONE_IDX)
-                        send_aud_seq(tf_none_j, TF_NONE_J_LEN);
+                if (max_idx == CELL_IDX)
+                {
+                    current_inf = TF_CELL;
+                }
+                else if (max_idx == HANDS_IDX)
+                {
+                    current_inf = TF_HANDS;
+                }
+                else if (max_idx == NONE_IDX)
+                {
+                    current_inf = TF_NOHANDS;
                 }
 
                 nanosleep(&del_sleep, NULL);

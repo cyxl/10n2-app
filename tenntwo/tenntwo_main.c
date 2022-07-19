@@ -12,6 +12,7 @@
 #include <10n2_dp.h>
 #include <10n2_tf_pi.h>
 #include <10n2_menu_handler.h>
+#include <10n2_rec.h>
 
 #include <sys/boardctl.h>
 
@@ -25,10 +26,9 @@ int tenntwo_main(int argc, char *argv[])
   printf("TNT start\n");
   boardctl(BOARDIOC_INIT, 0);
 
-  struct cam_req cam_nowrite_bw_r = {2, 0, 160, 0, 320, 120, 0, ""};
-  struct imu_req imu_r = {1e6, 100}; // TODO 5000 total secs.
-  struct gnss_req gnss_r = {10, 100};
-  struct tf_req tf_r = {500, 1000};
+  struct imu_req imu_r = {1e6, 100}; 
+  struct gnss_req gnss_r = {1e6, 250};
+
   cam_init();
   imu_init();
   gnss_init();
@@ -36,11 +36,14 @@ int tenntwo_main(int argc, char *argv[])
   btn_init();
   dp_init();
   tf_pi_init();
+  rec_init();
   menu_handler_init();
 
   send_aud_seq(startup_jingle, STARTUP_JINGLE_LEN);
 
   send_imu_req(imu_r);
+  send_gnss_req(gnss_r);
+
   while (1)
   {
     //   send_gnss_req(gnss_r);
@@ -57,6 +60,7 @@ int tenntwo_main(int argc, char *argv[])
   menu_handler_teardown();
   aud_teardown();
   btn_teardown();
+  rec_teardown();
   tf_pi_teardown();
 
   return 0;

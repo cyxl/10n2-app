@@ -16,7 +16,7 @@
 #include <10n2_btn.h>
 #include <10n2_aud.h>
 
-#define BTN_LONG_HOLD 150
+#define BTN_LONG_HOLD 120
 #define BTN_REALLY_SHORT_HOLD 5
 #define BTN_SHORT_HOLD 50
 #define BTN_DOWN 0
@@ -35,17 +35,13 @@ void play_menu_jingle()
     {
         send_aud_seq(btn_menu_1_j, BTN_MENU_1_J_LEN);
     }
-    else if (current_menu == pos)
+    else if (current_menu == inf)
     {
         send_aud_seq(btn_menu_2_j, BTN_MENU_2_J_LEN);
     }
-    else if (current_menu == img)
+    else if (current_menu == train)
     {
         send_aud_seq(btn_menu_3_j, BTN_MENU_3_J_LEN);
-    }
-    else if (current_menu == inf)
-    {
-        send_aud_seq(btn_menu_4_j, BTN_MENU_4_J_LEN);
     }
 
     if ((int)current_submenu == 0)
@@ -75,17 +71,13 @@ void toggle_submenu()
     {
         current_submenu = (current_submenu + 1) % num_top_menu;
     }
-    else if (current_menu == pos)
-    {
-        current_submenu = (current_submenu + 1) % num_pos_menu;
-    }
-    else if (current_menu == img)
-    {
-        current_submenu = (current_submenu + 1) % num_img_menu;
-    }
     else if (current_menu == inf)
     {
         current_submenu = (current_submenu + 1) % num_inf_menu;
+    }
+    else if (current_menu == train)
+    {
+        current_submenu = (current_submenu + 1) % num_train_menu;
     }
     play_menu_jingle();
 }

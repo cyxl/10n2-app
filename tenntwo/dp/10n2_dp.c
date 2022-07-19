@@ -18,6 +18,11 @@
 
 static bool dp_running = true;
 
+//Globals
+float current_x_slope;
+float current_y_slope;
+float current_z_slope;
+
 static pthread_t dp_th_consumer;
 
 float sum(float *vals, uint8_t num)
@@ -80,11 +85,9 @@ void *_dp_run(void *args)
         float *acx = get_latest_imu_samples(0);
         float *acy = get_latest_imu_samples(1);
         float *acz = get_latest_imu_samples(2);
-        float x_slope = get_slope(acx,IMU_SAMPLE_SIZE);
-        float y_slope = get_slope(acy,IMU_SAMPLE_SIZE);
-        float z_slope = get_slope(acz,IMU_SAMPLE_SIZE);
-        printf("slope %f %f %f\n",x_slope,y_slope,z_slope);
-        // printf("means %f,%f,%f,%f,%f,%f\n",acx_r, acy_r, acz_r, gyx_r, gyy_r, gyz_r);
+        current_x_slope = get_slope(acx,IMU_SAMPLE_SIZE);
+        current_y_slope = get_slope(acy,IMU_SAMPLE_SIZE);
+        current_z_slope = get_slope(acz,IMU_SAMPLE_SIZE);
     }
     printf("dp done!\n");
     return NULL;

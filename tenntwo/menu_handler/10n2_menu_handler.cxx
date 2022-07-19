@@ -21,78 +21,39 @@
 #include <10n2_cam.h>
 #include <10n2_gnss.h>
 #include <10n2_tf_pi.h>
+#include <10n2_rec.h>
+#include <10n2_dp.h>
+
+#define INF_CONF .5
+#define YSLOPE_MAX 200
+#define YSLOPE_MIN -200
+#define XSLOPE_MAX 200
+#define XSLOPE_MIN -200
+#define ZSLOPE_MAX 200
+#define ZSLOPE_MIN -200
 
 static bool menu_handler_running = true;
 
 static pthread_t menu_handler_th;
 
+struct tf_req tf_r = {1, 0};
+struct cam_req cam_nowrite_bw_r = {1, 900, 192, 12, 288, 108, 0, ""};
 struct cam_req cam_hands_bw_r = {2, 0, 192, 12, 288, 108, 0, "hds"};
 struct cam_req cam_cell_bw_r = {2, 0, 192, 12, 288, 108, 0, "cell"};
 struct cam_req cam_none_bw_r = {2, 0, 192, 12, 288, 108, 0, "none"};
-struct cam_req cam_nowrite_bw_r = {1, 0, 192, 12, 288, 108, 0, ""};
-struct tf_req inf_r = {1, 0};
+struct rec_req rec_open_r = {0, 0, rec_open, 0};
+struct rec_req rec_close_r = {0, 0, rec_close, 0};
+struct rec_req rec_write_r = {1, 0, rec_write, 0};
 
 #define CAM_PERIOD 45
 #define INF_PERIOD 45
 #define POS_PERIOD 1
-FILE *pos_pf = NULL;
-
-#define POS_SAVE_DIR "/mnt/sd0/pos"
-
-void close_pos_fd()
-{
-    if (pos_pf != NULL)
-    {
-        if (fclose(pos_pf) != 0)
-        {
-            printf("Unable to close pos file! :%s\n", strerror(errno));
-        }
-        else
-        {
-            printf("success!  closed pos output file\n");
-        }
-        pos_pf = NULL;
-    }
-}
-void open_pos_fd()
-{
-    unsigned curr_time = clock();
-    char namebuf[128];
-    snprintf(namebuf, 128, "%s/imu-data-%i-%i.%s", POS_SAVE_DIR, current_submenu, curr_time, "csv");
-    printf("opening :%s\n", namebuf);
-    pos_pf = fopen(namebuf, "wb+");
-    if (pos_pf == NULL)
-    {
-        printf("Unable to open pos! :%s\n", strerror(errno));
-    }
-    else
-    {
-        printf("success!  opened pos output file\n");
-    }
-    // TODO
-    if (current_submenu == imu)
-        fprintf(pos_pf, "t,acx,acy,acz,gyx,gyy,gyz\n");
-    else if (current_submenu == gnss)
-        fprintf(pos_pf, "t,y,M,d,h,m,s,us,t,lat,lon\n");
-    else if (current_submenu == imu_gnss)
-        fprintf(pos_pf, "t,acx,acy,acz,gyx,gyy,gyz,y,M,d,h,m,s,us,t,lat,lon\n");
-}
 
 void update_service(uint8_t last_submenu, uint32_t tick)
 {
-    if (current_menu == img)
+    if (current_menu == train)
     {
-        if (current_submenu == cam_bw_on)
-        {
-            if ((tick % CAM_PERIOD) == 0)
-                send_cam_req(cam_nowrite_bw_r);
-        }
-        if (current_submenu == cam_color_on)
-        {
-            //     if ((tick % CAM_PERIOD) == 0)
-            // TODO       send_cam_req(cam_c_r);
-        }
-        else if (current_submenu == cam_hands_on)
+        if (current_submenu == cam_hands_on)
         {
             if ((tick % CAM_PERIOD) == 0)
                 send_cam_req(cam_hands_bw_r);
@@ -108,76 +69,68 @@ void update_service(uint8_t last_submenu, uint32_t tick)
                 send_cam_req(cam_none_bw_r);
         }
     }
-    else if (current_menu == pos)
-    {
-        if (current_submenu > 0 && last_submenu != current_submenu)
-        {
-            open_pos_fd();
-        }
-        if (current_submenu == 0 && last_submenu != current_submenu)
-        {
-            close_pos_fd();
-        }
-
-        unsigned curr_time = clock();
-        if (current_submenu == imu)
-        {
-            fprintf(pos_pf, "%i,%i,%i,%i,%i,%i,%i\n",
-                    curr_time,
-                    current_pmu.ac_x,
-                    current_pmu.ac_y,
-                    current_pmu.ac_z,
-                    current_pmu.gy_x,
-                    current_pmu.gy_y,
-                    current_pmu.gy_z);
-        }
-        else if (current_submenu == gnss)
-        {
-            fprintf(pos_pf, "%i,%i,%i,%i,%i,%i,%i,%i,%i,%lf,%lf\n",
-                    curr_time,
-                    current_gnss.date.year,
-                    current_gnss.date.month,
-                    current_gnss.date.day,
-                    current_gnss.time.hour,
-                    current_gnss.time.minute,
-                    current_gnss.time.sec,
-                    current_gnss.time.usec,
-                    current_gnss.type,
-                    current_gnss.latitude,
-                    current_gnss.longitude);
-        }
-        else if (current_submenu == imu_gnss)
-        {
-            fprintf(pos_pf, "%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%lf,%lf\n",
-                    curr_time,
-                    current_pmu.ac_x,
-                    current_pmu.ac_y,
-                    current_pmu.ac_z,
-                    current_pmu.gy_x,
-                    current_pmu.gy_y,
-                    current_pmu.gy_z,
-                    current_gnss.date.year,
-                    current_gnss.date.month,
-                    current_gnss.date.day,
-                    current_gnss.time.hour,
-                    current_gnss.time.minute,
-                    current_gnss.time.sec,
-                    current_gnss.time.usec,
-                    current_gnss.type,
-                    current_gnss.latitude,
-                    current_gnss.longitude);
-        }
-    }
     else if (current_menu == inf)
     {
-        if (current_submenu == inf_on)
+        if (current_submenu == inf_record && last_submenu != current_submenu)
         {
-            if ((tick % INF_PERIOD) == 0)
+            // send open
+            send_rec_req(rec_open_r);
+        }
+        if (current_submenu != inf_record && last_submenu == inf_record)
+        {
+            // send close
+            send_rec_req(rec_close_r);
+        }
+        if (current_submenu == inf_off)
+        {
+            return;
+        }
+        if ((tick % INF_PERIOD) == 0)
+        {
+            send_cam_req(cam_nowrite_bw_r);
+            send_tf_req(tf_r);
+
+            if (current_submenu == inf_record)
             {
-                send_cam_req(cam_nowrite_bw_r);
-                send_tf_req(inf_r);
+                // send record
+                send_rec_req(rec_write_r);
+            }
+
+            // Process current inferences
+            if (current_conf > INF_CONF)
+            {
+                switch (current_inf)
+                {
+                case TF_CELL:
+                    printf("CELL %f\n", current_conf);
+                    send_aud_seq(tf_cell_j, TF_CELL_J_LEN);
+                    break;
+                case TF_NOHANDS:
+                    printf("NOHANDS %f\n", current_conf);
+                    send_aud_seq(tf_none_j, TF_NONE_J_LEN);
+                    break;
+                default:
+                    break;
+                }
             }
         }
+        if (current_y_slope >= YSLOPE_MAX)
+        {
+            send_aud_seq(acceleration_j_len, ACCELERATION_J_LEN);
+        }
+        else if (current_y_slope <= YSLOPE_MIN)
+        {
+            send_aud_seq(deceleration_j_len, DECELERATION_J_LEN);
+        }
+        if (current_z_slope >= ZSLOPE_MAX)
+        {
+            send_aud_seq(sharp_turn_j, SHARP_TURN_J_LEN);
+        }
+        else if (current_z_slope <= ZSLOPE_MIN)
+        {
+            send_aud_seq(sharp_turn_j, SHARP_TURN_J_LEN);
+        }
+        // TODO add x for pot holes
     }
 }
 

@@ -12,6 +12,10 @@ extern "C"
     bool dp_init(void);
     bool dp_teardown(void);
 
+    extern float current_x_slope;
+    extern float current_y_slope;
+    extern float current_z_slope;
+
 #ifdef __cplusplus
 }
 #endif

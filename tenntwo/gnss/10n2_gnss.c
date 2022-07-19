@@ -128,13 +128,15 @@ void *_gnss_q_read(void *args)
         if (ret == OK)
         {
           current_gnss = gdata;
-          printf("got lat:%lf lon:%lf\n",current_gnss.latitude,current_gnss.longitude);
-          send_aud_seq(gnss_jingle,GNSS_JINGLE_LEN);
+          printf("got lat:%lf lon:%lf\n", current_gnss.latitude, current_gnss.longitude);
+          send_aud_seq(gnss_jingle, GNSS_JINGLE_LEN);
         }
         else
         {
           current_gnss.type = NO_TYPE;
         }
+        struct timespec gnss_sleep = { r->delay / 1000, (r->delay % 1000) * 1e6 };
+        nanosleep(&gnss_sleep, NULL);
       }
     }
     else
