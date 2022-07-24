@@ -8,6 +8,8 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <nuttx/clock.h>
+#include <nuttx/sched.h>
+#include <nuttx/arch.h>
 #include <10n2_cam.h>
 #include <10n2_aud.h>
 
@@ -107,7 +109,7 @@ bool model_init(void)
     }
 
     static tflite::AllOpsResolver resolver;
-    // EI_TFLITE_RESOLVER
+    //   EI_TFLITE_RESOLVER
 
     interpreter = new tflite::MicroInterpreter(model, resolver, tnt_tensor_arena, tnt_arena_size, er);
 
@@ -132,6 +134,19 @@ void *_tf_thread(void *args)
 {
     (void)args; /* Suppress -Wunused-parameter warning. */
     /* Initialize the queue attributes */
+
+    int cpu = up_cpu_index();
+    printf("TF CPU %d\n", cpu);
+
+    sigset_t mask;
+    sigemptyset(&mask);
+    //TOOD 18
+    sigaddset(&mask, 18);
+    int ret = sigprocmask(SIG_BLOCK, &mask, NULL);
+    if (ret != OK)
+    {
+        printf("TF ERROR sigprocmask failed. %d\n", ret);
+    }
 
     /* Create the message queue. The queue reader is NONBLOCK. */
     mqd_t r_mq = mq_open(TF_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, TF_QUEUE_PERMS, &tf_attr_mq);
@@ -164,27 +179,30 @@ void *_tf_thread(void *args)
             for (int i = 0; i < r->num && tf_running; i++)
             {
 
+                // printf("quant\n");
                 cam_wait();
-                // for (int i = 0; i < 160 * 120; i++)
                 for (int img_idx = 0; img_idx < 96 * 96; img_idx++)
                 {
                     // d[i] = quantize(cell_test_data[i] & 0xff); // We only need first byte, bytes 1-3 all the same for gray
                     d[img_idx] = quantize(latest_img_buf[img_idx]);
                 }
                 cam_release();
-                //  Run the model on this input and make sure it succeeds.
+                // printf("done quant\n");
+                //   Run the model on this input and make sure it succeeds.
+                printf("=======================invoke\n");
                 if (kTfLiteOk != interpreter->Invoke())
                 {
                     printf("TF invoke failure!!!\n");
                     TF_LITE_REPORT_ERROR(er, "Invoke failed.");
                     continue;
                 }
+                printf("=======================done invoke\n");
 
-                for (int j = 0; j < num_classes; j++)
-                {
-                    float res = (od[j] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE;
-                //    printf("inf res %i : %f\n", j, res);
-                }
+                // for (int j = 0; j < num_classes; j++)
+                // {
+                //     float res = (od[j] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE;
+                //     printf("inf res %i : %f\n", j, res);
+                // }
 
                 float max_conf = 0;
                 int max_idx = -1;
@@ -200,7 +218,7 @@ void *_tf_thread(void *args)
                     }
                 }
 
-                printf("infs %f %f %d", max_conf, max_idx);
+                printf("infs %f %d\n", max_conf, max_idx);
                 current_conf = max_conf;
                 current_time_tf = clock();
 
@@ -255,7 +273,14 @@ bool tf_pi_init(void)
     model_init();
     printf("done model init\n");
     tf_running = true;
+    cpu_set_t cpuset = 1 << 2;
+    int rc = pthread_setaffinity_np(tf_th_consumer, sizeof(cpu_set_t), &cpuset);
     pthread_create(&tf_th_consumer, NULL, &_tf_thread, NULL);
+    if (rc != 0)
+    {
+        printf("Unable set CPU affinity : %d", rc);
+    }
+
     return true;
 }
 

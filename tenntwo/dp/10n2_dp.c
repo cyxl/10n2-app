@@ -14,16 +14,31 @@
 #include <sys/stat.h>
 #include <10n2_dp.h>
 #include <10n2_imu.h>
-// BWS#include <arm_math.h>
+#include <arm_math.h>
 
 static bool dp_running = true;
 
-//Globals
+// Globals
 float current_x_slope;
 float current_y_slope;
 float current_z_slope;
+float current_x_stdev;
+float current_y_stdev;
+float current_z_stdev;
+
+#define YSLOPE_MIN -100
+#define XSLOPE_MAX 200
+#define XSLOPE_MIN -200
+#define ZSLOPE_MAX 200
+#define ZSLOPE_MIN -200
+#define ZSTDEV_MAX 100
+
+#define CLEAR_BIT 19
+
+uint32_t current_imu_bit = 0;
 
 static pthread_t dp_th_consumer;
+uint64_t cnt = 0;
 
 float sum(float *vals, uint8_t num)
 {
@@ -45,49 +60,84 @@ void sqr(float *x, float *res, uint8_t num)
         res[i] = x[i] * x[i];
 }
 
-static float x_vals[IMU_SAMPLE_SIZE]; 
-float get_slope(float* vals,uint8_t size)
+static float x_vals[IMU_SAMPLE_SIZE];
+float get_slope(float *vals, uint8_t size)
 {
     // TODO lock
     float xy_prods[size];
     float x_sqrs[size];
     float xsum;
     float ysum;
-    product(x_vals,vals,xy_prods,size);
-    xsum = sum(x_vals,size);
-    ysum = sum(vals,size);
-    sqr(x_vals,x_sqrs,size);
+    product(x_vals, vals, xy_prods, size);
+    xsum = sum(x_vals, size);
+    ysum = sum(vals, size);
+    sqr(x_vals, x_sqrs, size);
 
-    return ((size * sum(xy_prods,size)) - (xsum * ysum)) / 
-           ((size * sum(x_sqrs,size))-(xsum*xsum));
-
+    return ((size * sum(xy_prods, size)) - (xsum * ysum)) /
+           ((size * sum(x_sqrs, size)) - (xsum * xsum));
 }
 void *_dp_run(void *args)
 {
     (void)args; /* Suppress -Wunused-parameter warning. */
-    /* Initialize the queue attributes */
+                /* Initialize the queue attributes */
 
-    // TODO make size configurable
+    int cpu = up_cpu_index();
+    printf("DP CPU %d\n", cpu);
     struct timespec poll_sleep = {0, 100000000};
-    /*
-    float32_t acx_r;
-    float32_t acy_r;
-    float32_t acz_r;
-    float32_t gyx_r;
-    float32_t gyy_r;
-    float32_t gyz_r;
-    */
 
+    sigset_t mask;
+    sigemptyset(&mask);
+    // TOOD 18
+    sigaddset(&mask, 18);
+    int ret = sigprocmask(SIG_BLOCK, &mask, NULL);
+    if (ret != OK)
+    {
+        printf("TF ERROR sigprocmask failed. %d\n", ret);
+    }
     while (dp_running)
     {
+        if (cnt++ % CLEAR_BIT)
+            current_imu_bit = 0;
+
         nanosleep(&poll_sleep, NULL);
 
         float *acx = get_latest_imu_samples(0);
         float *acy = get_latest_imu_samples(1);
         float *acz = get_latest_imu_samples(2);
-        current_x_slope = get_slope(acx,IMU_SAMPLE_SIZE);
-        current_y_slope = get_slope(acy,IMU_SAMPLE_SIZE);
-        current_z_slope = get_slope(acz,IMU_SAMPLE_SIZE);
+        current_x_slope = get_slope(acx, IMU_SAMPLE_SIZE);
+        current_y_slope = get_slope(acy, IMU_SAMPLE_SIZE);
+        current_z_slope = get_slope(acz, IMU_SAMPLE_SIZE);
+
+        // std deviations
+        arm_std_f32(acx, IMU_SAMPLE_SIZE, &current_x_stdev);
+        arm_std_f32(acy, IMU_SAMPLE_SIZE, &current_y_stdev);
+        arm_std_f32(acz, IMU_SAMPLE_SIZE, &current_z_stdev);
+
+        if (current_y_slope >= YSLOPE_MAX)
+        {
+            printf("==================accel\n");
+            current_imu_bit |= ACCEL_BIT;
+        }
+        else if (current_y_slope <= YSLOPE_MIN)
+        {
+            printf("==================decel\n");
+            current_imu_bit |= DECEL_BIT;
+        }
+        else if (current_z_slope >= ZSLOPE_MAX)
+        {
+            printf("==================left\n");
+            current_imu_bit |= LEFT_BIT;
+        }
+        else if (current_z_slope <= ZSLOPE_MIN)
+        {
+            printf("==================right\n");
+            current_imu_bit |= RIGHT_BIT;
+        }
+        else if (current_x_stdev >= ZSTDEV_MAX)
+        {
+            printf("==================pothole\n");
+            current_imu_bit |= POTHOLE_BIT;
+        }
     }
     printf("dp done!\n");
     return NULL;
@@ -97,10 +147,16 @@ bool dp_init(void)
 {
     printf("dp init\n");
     dp_running = true;
+    cpu_set_t cpuset = 1 << 3;
+    int rc = pthread_setaffinity_np(dp_th_consumer, sizeof(cpu_set_t), &cpuset);
+    if (rc != 0)
+    {
+        printf("Unable set CPU affinity : %d", rc);
+    }
     pthread_create(&dp_th_consumer, NULL, &_dp_run, NULL);
 
-    for (int i=1;i<=IMU_SAMPLE_SIZE;i++)
-       x_vals[i] = (float)i; 
+    for (int i = 1; i <= IMU_SAMPLE_SIZE; i++)
+        x_vals[i] = (float)i;
     return true;
 }
 

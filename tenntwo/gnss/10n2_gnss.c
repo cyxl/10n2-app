@@ -1,5 +1,6 @@
 
 #include <nuttx/config.h>
+#include <nuttx/arch.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
@@ -20,7 +21,8 @@
 
 #define GNSS_POLL_FD_NUM 1
 #define GNSS_POLL_TIMEOUT_FOREVER -1
-#define MY_GNSS_SIG 18
+#define POLL_FD_NUM 1
+#define POLL_TIMEOUT_FOREVER -1
 
 static struct cxd56_gnss_positiondata_s posdat;
 
@@ -33,16 +35,21 @@ static bool gnss_running = true;
 
 #define GNSS_QUEUE_POLL ((struct timespec){0, 100000000})
 
-#define GNSS_SAVE_DIR "/mnt/sd0"
 static struct mq_attr gnss_attr_mq = GNSS_QUEUE_ATTR_INITIALIZER;
 static pthread_t gnss_th_consumer;
 
-struct gnss_data current_gnss;
+struct cxd56_gnss_positiondata_s current_gnss;
+
+static struct pollfd g_fds[GNSS_POLL_FD_NUM] = {{0}};
 
 void *_gnss_q_read(void *args)
 {
   (void)args; /* Suppress -Wunused-parameter warning. */
-  /* Initialize the queue attributes */
+              /* Initialize the queue attributes */
+
+  int cpu = up_cpu_index();
+  printf("GNSS CPU %d\n", cpu);
+  struct timespec poll_sleep = {0, 100000000};
 
   /* Create the message queue. The queue reader is NONBLOCK. */
   mqd_t r_mq = mq_open(GNSS_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, GNSS_QUEUE_PERMS, &gnss_attr_mq);
@@ -57,11 +64,7 @@ void *_gnss_q_read(void *args)
   unsigned int prio;
   ssize_t bytes_read;
   char buffer[GNSS_QUEUE_MSGSIZE];
-  struct timespec poll_sleep;
-  // TODO make size configurable
 
-  sigset_t mask;
-  struct cxd56_gnss_signal_setting_s setting;
   int gnss_fd;
   gnss_fd = open("/dev/gps", O_RDONLY);
 
@@ -71,32 +74,7 @@ void *_gnss_q_read(void *args)
     return -ENODEV;
   }
 
-  sigemptyset(&mask);
-  sigaddset(&mask, MY_GNSS_SIG);
-  int ret = sigprocmask(SIG_BLOCK, &mask, NULL);
-  if (ret != OK)
-  {
-    printf("sigprocmask failed. %d\n", ret);
-    return false;
-  }
-
-  /* Set the signal to notify GNSS events. */
-
-  setting.fd = gnss_fd;
-  setting.enable = 1;
-  setting.gnsssig = CXD56_GNSS_SIG_GNSS;
-  setting.signo = MY_GNSS_SIG;
-  setting.data = NULL;
-
-  ret = ioctl(gnss_fd, CXD56_GNSS_IOCTL_SIGNAL_SET, (unsigned long)&setting);
-  printf("Ready, GNSS(USE_SIGNAL) SAMPLE!!\n");
-  ret = gnss_setparams(gnss_fd);
-  if (ret != OK)
-  {
-    printf("gnss_setparams failed. %d\n", ret);
-    return false;
-  }
-  ret = ioctl(gnss_fd, CXD56_GNSS_IOCTL_START, CXD56_GNSS_STMOD_HOT);
+  int ret = ioctl(gnss_fd, CXD56_GNSS_IOCTL_START, CXD56_GNSS_STMOD_HOT);
   if (ret < 0)
   {
     printf("start GNSS ERROR %d\n", errno);
@@ -107,7 +85,9 @@ void *_gnss_q_read(void *args)
     printf("start GNSS OK\n");
   }
 
-  struct gnss_data gdata;
+  g_fds[0].fd = gnss_fd;
+  g_fds[0].events = POLLIN;
+
   while (gnss_running)
   {
 
@@ -118,24 +98,52 @@ void *_gnss_q_read(void *args)
     {
       for (int i = 0; i < r->num; i++)
       {
-        ret = sigwaitinfo(&mask, NULL);
-        if (ret != MY_GNSS_SIG)
+
+        ret = poll(g_fds, POLL_FD_NUM, POLL_TIMEOUT_FOREVER);
+        if (ret <= 0)
         {
-          printf("sigwaitinfo error %d\n", ret);
+          printf("poll error %d,%x,%x\n", ret,
+                 g_fds[0].events, g_fds[0].revents);
           break;
         }
-        ret = read_gnss(gnss_fd, &gdata);
-        if (ret == OK)
+        if (g_fds[0].revents & POLLIN)
         {
-          current_gnss = gdata;
-          printf("got lat:%lf lon:%lf\n", current_gnss.latitude, current_gnss.longitude);
-          send_aud_seq(gnss_jingle, GNSS_JINGLE_LEN);
+          /* Read pos data. */
+
+          ret = read(gnss_fd, &current_gnss, sizeof(current_gnss));
+          if (ret < 0)
+          {
+            printf("Error read position data\n");
+            break;
+          }
+          else if (ret != sizeof(current_gnss))
+          {
+            ret = ERROR;
+            printf("Size error read position data\n");
+            break;
+          }
+          else
+          {
+            ret = OK;
+          }
+
+          printf("UTC time : Hour:%d, minute:%d, sec:%d\n",
+                 current_gnss.receiver.time.hour, current_gnss.receiver.time.minute,
+                 current_gnss.receiver.time.sec);
+          if (current_gnss.receiver.pos_dataexist)
+          {
+            /* Detect position. */
+            printf("## POSITION: LAT %ld, LNG %ld \n", current_gnss.receiver.latitude,current_gnss.receiver.longitude);
+            send_aud_seq(gnss_jingle,GNSS_JINGLE_LEN);
+            break;
+          }
+          else
+          {
+            printf("## No Positioning Data\n");
+          }
         }
-        else
-        {
-          current_gnss.type = NO_TYPE;
-        }
-        struct timespec gnss_sleep = { r->delay / 1000, (r->delay % 1000) * 1e6 };
+
+        struct timespec gnss_sleep = {r->delay / 1000, (r->delay % 1000) * 1e6};
         nanosleep(&gnss_sleep, NULL);
       }
     }
@@ -172,9 +180,15 @@ bool send_gnss_req(struct gnss_req req)
 bool gnss_init(void)
 {
   printf("gnss init\n");
-  current_gnss.type = NO_TYPE;
+  current_gnss.receiver.type = NO_TYPE;
   gnss_running = true;
 
+  cpu_set_t cpuset = 1 << 5;
+  int rc = pthread_setaffinity_np(gnss_th_consumer, sizeof(cpu_set_t), &cpuset);
+  if (rc != 0)
+  {
+    printf("Unable set CPU affinity : %d", rc);
+  }
   pthread_create(&gnss_th_consumer, NULL, &_gnss_q_read, NULL);
 
   return true;

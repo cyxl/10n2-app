@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <sched.h>
 #include <mqueue.h>
 #include <sys/types.h>
 #include <fcntl.h>
@@ -13,6 +14,7 @@
 #include <arch/board/board.h>
 #include <arch/chip/audio.h>
 
+#include <nuttx/arch.h>
 #include <10n2_cam.h>
 #include <10n2_aud.h>
 #include <tnt_image_provider.h>
@@ -39,6 +41,19 @@ void *_cam_q_read(void *args)
 
     (void)args; /* Suppress -Wunused-parameter warning. */
     /* Initialize the queue attributes */
+
+    int cpu = up_cpu_index();
+    printf("CAM CPU %d\n", cpu);
+
+    sigset_t mask;
+    sigemptyset(&mask);
+    // TOOD 18
+    sigaddset(&mask, 18);
+    int ret = sigprocmask(SIG_BLOCK, &mask, NULL);
+    if (ret != OK)
+    {
+        printf("CAM ERROR sigprocmask failed. %d\n", ret);
+    }
 
     /* Create the message queue. The queue reader is NONBLOCK. */
     mqd_t r_mq = mq_open(CAM_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, CAM_QUEUE_PERMS, &cam_attr_mq);
@@ -140,6 +155,12 @@ bool cam_init(void)
 {
     printf("bws cam init\n");
     cam_running = true;
+    cpu_set_t cpuset = 1 << 4;
+    int rc = pthread_setaffinity_np(cam_th_consumer, sizeof(cpu_set_t), &cpuset);
+    if (rc != 0)
+    {
+        printf("Unable set CPU affinity : %d", rc);
+    }
     pthread_create(&cam_th_consumer, NULL, &_cam_q_read, NULL);
     if (0 != (errno = pthread_mutex_init(&cam_mutex, NULL)))
     {
@@ -154,6 +175,7 @@ bool cam_teardown(void)
     printf("cam teardown\n");
     cam_running = false;
     pthread_join(cam_th_consumer, NULL);
+
     return true;
 }
 

@@ -8,6 +8,7 @@ extern "C" {
 #endif
 
 #include <arch/chip/gnss_type.h>
+
 struct cxd56_gnss_dms_s
 {
   int8_t   sign;
@@ -42,7 +43,7 @@ bool gnss_teardown(void);
 
 bool send_gnss_req(struct gnss_req req);
 
-extern struct gnss_data current_gnss;
+extern struct cxd56_gnss_positiondata_s current_gnss;
 
 #ifdef __cplusplus
 }

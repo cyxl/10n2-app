@@ -12,6 +12,7 @@
 #include <time.h>
 #include <arch/board/board.h>
 #include <nuttx/clock.h>
+#include <nuttx/arch.h>
 #include <10n2_rec.h>
 #include <10n2_imu.h>
 #include <10n2_aud.h>
@@ -52,11 +53,18 @@ void close_pos_fd()
     }
 }
 
-void open_pos_fd(uint8_t cnt)
+void open_pos_fd(uint8_t cnt, bool verbose)
 {
+
+    if (pos_pf != NULL)
+    {
+        printf("Closing open file\n");
+        close_pos_fd();
+    }
     unsigned curr_time = clock();
     char namebuf[128];
-    snprintf(namebuf, 128, "%s/imu-data-%i-%i.%s", POS_SAVE_DIR, cnt, curr_time, "csv");
+    const char *type = verbose ? "verbose" : "terse";
+    snprintf(namebuf, 128, "%s/tf-data-%s-%i-%i.%s", POS_SAVE_DIR, type, cnt, curr_time, "csv");
     printf("opening :%s\n", namebuf);
     pos_pf = fopen(namebuf, "wb+");
     if (pos_pf == NULL)
@@ -67,13 +75,30 @@ void open_pos_fd(uint8_t cnt)
     {
         printf("success!  opened pos output file\n");
     }
-    fprintf(pos_pf, "t,slopex,slopey,slopez,inf,conf,acx,acy,acz,gyx,gyy,gyz,y,M,d,h,m,s,us,t,lat,lon\n");
+
+    if (verbose)
+        fprintf(pos_pf, "t,slopex,slopey,slopez,inf,conf,acx,acy,acz,gyx,gyy,gyz,y,M,d,h,m,s,us,type,lat,lon\n");
+    else
+        fprintf(pos_pf, "t,inf,conf,imu,y,M,d,h,m,s,us,type,lat,lon\n");
+    fflush(pos_pf);
 }
 
 void *_rec_run(void *args)
 {
     (void)args; /* Suppress -Wunused-parameter warning. */
                 /* Initialize the queue attributes */
+    int cpu = up_cpu_index();
+    printf("REC CPU %d\n", cpu);
+
+    sigset_t mask;
+    sigemptyset(&mask);
+    // TOOD 18
+    sigaddset(&mask, 18);
+    int ret = sigprocmask(SIG_BLOCK, &mask, NULL);
+    if (ret != OK)
+    {
+        printf("TF ERROR sigprocmask failed. %d\n", ret);
+    }
     mqd_t r_mq = mq_open(REC_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, REC_QUEUE_PERMS, &rec_attr_mq);
     if (r_mq < 0)
     {
@@ -96,44 +121,73 @@ void *_rec_run(void *args)
             {
                 r->delay / 1000, (r->delay % 1000) * 1e6
             };
-            if (r->type == rec_open)
+            if (r->act == rec_open)
             {
-                open_pos_fd(r->f_id);
+                open_pos_fd(r->f_id, r->type == rec_verbose);
             }
-            else if (r->type == rec_close)
+            else if (r->act == rec_close)
             {
                 close_pos_fd();
             }
             else
             {
-                for (int i = 0; i < r->num; i++)
+                if (r->type == rec_verbose)
                 {
-                    printf("recording!\n");
-                    unsigned curr_time = clock();
-                    fprintf(pos_pf, "%i,%f,%f,%f,%i,%f,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%lf,%lf\n",
-                            curr_time,
-                            current_x_slope,
-                            current_y_slope,
-                            current_z_slope,
-                            current_inf,
-                            current_conf,
-                            current_pmu.ac_x,
-                            current_pmu.ac_y,
-                            current_pmu.ac_z,
-                            current_pmu.gy_x,
-                            current_pmu.gy_y,
-                            current_pmu.gy_z,
-                            current_gnss.date.year,
-                            current_gnss.date.month,
-                            current_gnss.date.day,
-                            current_gnss.time.hour,
-                            current_gnss.time.minute,
-                            current_gnss.time.sec,
-                            current_gnss.time.usec,
-                            current_gnss.type,
-                            current_gnss.latitude,
-                            current_gnss.longitude);
-                    nanosleep(&rec_sleep, NULL);
+                    for (int i = 0; i < r->num; i++)
+                    {
+                        unsigned curr_time = clock();
+                        fprintf(pos_pf, "%i,%f,%f,%f,%i,%f,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%lf,%lf\n",
+                                curr_time,
+                                current_x_slope,
+                                current_y_slope,
+                                current_z_slope,
+                                current_inf,
+                                current_conf,
+                                current_pmu.ac_x,
+                                current_pmu.ac_y,
+                                current_pmu.ac_z,
+                                current_pmu.gy_x,
+                                current_pmu.gy_y,
+                                current_pmu.gy_z,
+                                current_gnss.date.year,
+                                current_gnss.date.month,
+                                current_gnss.date.day,
+                                current_gnss.time.hour,
+                                current_gnss.time.minute,
+                                current_gnss.time.sec,
+                                current_gnss.time.usec,
+                                current_gnss.type,
+                                current_gnss.latitude,
+                                current_gnss.longitude);
+                        int rc = fflush(pos_pf);
+                        printf("recording verbose : %d!\n", rc);
+                        nanosleep(&rec_sleep, NULL);
+                    }
+                }
+                else if (r->type == rec_terse)
+                {
+                    for (int i = 0; i < r->num; i++)
+                    {
+                        unsigned curr_time = clock();
+                        fprintf(pos_pf, "%i,%i,%f,%i,%i,%i,%i,%i,%i,%i,%i,%i,%lf,%lf\n",
+                                curr_time,
+                                current_inf,
+                                current_conf,
+                                current_imu_bit,
+                                current_gnss.date.year,
+                                current_gnss.date.month,
+                                current_gnss.date.day,
+                                current_gnss.time.hour,
+                                current_gnss.time.minute,
+                                current_gnss.time.sec,
+                                current_gnss.time.usec,
+                                current_gnss.type,
+                                current_gnss.latitude,
+                                current_gnss.longitude);
+                        int rc = fflush(pos_pf);
+                        printf("recording terse : %d!\n", rc);
+                        nanosleep(&rec_sleep, NULL);
+                    }
                 }
             }
         }
@@ -168,6 +222,13 @@ bool rec_init(void)
 {
     printf("menu handler init\n");
     rec_running = true;
+
+    cpu_set_t cpuset = 1 << 3;
+    int rc = pthread_setaffinity_np(rec_th, sizeof(cpu_set_t), &cpuset);
+    if (rc != 0)
+    {
+        printf("Unable set CPU affinity : %d", rc);
+    }
     pthread_create(&rec_th, NULL, &_rec_run, NULL);
 
     return true;

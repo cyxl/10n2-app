@@ -48,6 +48,7 @@ CFLAGS += -I$(MENU_HDLR_SRC_DIR)
 CFLAGS += -I$(UTIL_SRC_DIR)
 CFLAGS += -I$(REC_SRC_DIR)
 CFLAGS += -I$(MODEL_SRC_DIR)
+CFLAGS += -DSPRESENSE_CONFIG_H="\"/home/bstaley/git/spresense/nuttx/include/nuttx/config.h\"" 
 
 CFLAGS += -I$(TOPDIR)/arch/arm/src/cxd56xx/
 CFLAGS += -DNDEBUG					# Disable assert() macro

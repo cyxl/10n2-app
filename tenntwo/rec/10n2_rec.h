@@ -9,13 +9,18 @@ extern "C" {
 typedef enum {
     rec_open=0,
     rec_close,
-    rec_write
+    rec_write,
 }rec_act;
+typedef enum {
+    rec_verbose = 0,
+    rec_terse,
+}rec_type;
 struct rec_req
 {
     int8_t num;
     int16_t delay;
-    rec_act type;
+    rec_act act;
+    rec_type type;
     uint8_t f_id;
 };
 

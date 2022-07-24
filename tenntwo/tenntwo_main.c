@@ -3,6 +3,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <nuttx/signal.h>
+#include <nuttx/arch.h>
 
 #include <10n2_cam.h>
 #include <10n2_aud.h>
@@ -26,15 +27,19 @@ int tenntwo_main(int argc, char *argv[])
   printf("TNT start\n");
   boardctl(BOARDIOC_INIT, 0);
 
-  struct imu_req imu_r = {1e6, 100}; 
-  struct gnss_req gnss_r = {1e6, 250};
+  struct imu_req imu_r = {1e6, 50}; 
+  struct gnss_req gnss_r = {1e6, 500};
+  struct tf_req tf_r = {200, 0};
 
-  cam_init();
+  int cpu = up_cpu_index();
+  printf("MAIN CPU %d\n",cpu);
+  printf("NUM CPUS%d\n",CONFIG_SMP_NCPUS);
+  aud_init();
   imu_init();
   gnss_init();
-  aud_init();
   btn_init();
   dp_init();
+  cam_init();
   tf_pi_init();
   rec_init();
   menu_handler_init();

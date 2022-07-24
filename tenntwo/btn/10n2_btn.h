@@ -7,7 +7,7 @@ extern "C" {
 #endif
 
 
-enum tnt_menu{
+enum tnt_men{
     top = 0,
     inf,
     train,
@@ -27,15 +27,15 @@ enum tnt_train_menu{
     cam_hands_on,
     cam_cell_on,
     cam_none_on,
-    num_train_menu,  //TODO 
+    num_train_menu,  
 };
 
 enum tnt_inf_menu{
     inf_off=0,
     inf_on,
-    inf_record,
-    inf_unused1,
-    num_inf_menu,  //TODO 
+    inf_rec_terse,
+    inf_rec_verbose,
+    num_inf_menu,  
 };
 extern uint8_t current_menu;
 extern uint8_t current_submenu;

@@ -42,10 +42,11 @@ static struct aud_req shutdown_jingle[SHUTDOWN_JINGLE_LEN] = {
   {1,DEF_VOLUME,400,100},
 };
 
-#define GNSS_JINGLE_LEN 1
-
+#define GNSS_JINGLE_LEN 6 
 static struct aud_req gnss_jingle[GNSS_JINGLE_LEN] = {
-  {1,DEF_VOLUME,400,50},
+  {1,DEF_VOLUME,1900,10}, {0,255,0,0}, //off
+  {1,DEF_VOLUME,2000,20}, {0,255,0,0}, //off
+  {1,DEF_VOLUME,1900,10}, {0,255,0,0}, //off
 };
 
 
@@ -108,15 +109,15 @@ static struct aud_req btn_submenu_3_j[BTN_SUBMENU_3_J_LEN] = {
 static struct aud_req btn_submenu_4_j[BTN_SUBMENU_4_J_LEN] = {
   {1,DEF_VOLUME,900,100}, {0,255,0,20}, //off
   {1,DEF_VOLUME,900,100}, {0,255,0,20}, //off
-  {1,DEF_VOLUME,900,100}, {0,255,0,0}, //off
+  {1,DEF_VOLUME,900,100}, {0,255,0,20}, //off
   {1,DEF_VOLUME,900,100}, {0,255,0,0}, //off
 };
 #define BTN_SUBMENU_5_J_LEN 10
 static struct aud_req btn_submenu_5_j[BTN_SUBMENU_5_J_LEN] = {
   {1,DEF_VOLUME,900,100}, {0,255,0,20}, //off
   {1,DEF_VOLUME,900,100}, {0,255,0,20}, //off
-  {1,DEF_VOLUME,900,100}, {0,255,0,0}, //off
-  {1,DEF_VOLUME,900,100}, {0,255,0,0}, //off
+  {1,DEF_VOLUME,900,100}, {0,255,0,20}, //off
+  {1,DEF_VOLUME,900,100}, {0,255,0,20}, //off
   {1,DEF_VOLUME,900,100}, {0,255,0,0}, //off
 };
 #define BTN_ERR_J_LEN 2
@@ -141,19 +142,19 @@ static struct aud_req tf_none_j[TF_NONE_J_LEN] = {
 
 #define CAM_CAPTURE_J_LEN 2
 static struct aud_req cam_cap_j[CAM_CAPTURE_J_LEN] = {
-  {1,DEF_VOLUME,1900,10}, {0,255,0,0}, //off
+  {1,DEF_VOLUME,1800,10}, {0,255,0,0}, //off
 };
   
 #define SHARP_TURN_J_LEN 8
 static struct aud_req sharp_turn_j[SHARP_TURN_J_LEN] = {
-  {1,DEF_VOLUME,1800,50},
-  {1,DEF_VOLUME,1800,50},
-  {1,DEF_VOLUME,300,50},
+  {1,DEF_VOLUME,1800,50},{0,255,0,0},
+  {1,DEF_VOLUME,1800,50},{0,255,0,0},
+  {1,DEF_VOLUME,300,50},{0,255,0,0},
   {1,DEF_VOLUME,300,50}, {0,255,0,0},
 };
   
-#define DECELERATION_J_LEN 10
-static struct aud_req deceleration_j_len[DECELERATION_J_LEN] = {
+#define DECELERATION_J_LEN 6
+static struct aud_req deceleration_j[DECELERATION_J_LEN] = {
   {1,DEF_VOLUME,1500,50}, 
   {1,DEF_VOLUME,1200,50}, 
   {1,DEF_VOLUME,900,50}, 
@@ -161,8 +162,8 @@ static struct aud_req deceleration_j_len[DECELERATION_J_LEN] = {
   {1,DEF_VOLUME,300,50}, {0,255,0,0},
 };
 
-#define ACCELERATION_J_LEN 10
-static struct aud_req acceleration_j_len[ACCELERATION_J_LEN] = {
+#define ACCELERATION_J_LEN 6
+static struct aud_req acceleration_j[ACCELERATION_J_LEN] = {
   {1,DEF_VOLUME,300,50},
   {1,DEF_VOLUME,600,50},
   {1,DEF_VOLUME,900,50},
@@ -170,18 +171,25 @@ static struct aud_req acceleration_j_len[ACCELERATION_J_LEN] = {
   {1,DEF_VOLUME,1500,50}, {0,225,0,0},
 };
   
-#define NO_HANDS_J_LEN 6
-static struct aud_req no_hands_j_len[NO_HANDS_J_LEN] = {
+#define NO_HANDS_J_LEN 4
+static struct aud_req no_hands_j[NO_HANDS_J_LEN] = {
   {1,DEF_VOLUME,1500,50},
   {1,DEF_VOLUME,300,50},
   {1,DEF_VOLUME,1500,50}, {0,225,0,0},
 };
   
-#define PHONE_J_LEN 6
-static struct aud_req phone_j_len[PHONE_J_LEN] = {
+#define PHONE_J_LEN 4
+static struct aud_req phone_j[PHONE_J_LEN] = {
   {1,DEF_VOLUME,300,50},
   {1,DEF_VOLUME,1500,50},
   {1,DEF_VOLUME,300,50}, {0,255,0,0},
+};
+
+#define POTHOLE_J_LEN 6
+static struct aud_req pothole_j[POTHOLE_J_LEN] = {
+  {1,DEF_VOLUME,300,5}, {0,255,0,1},
+  {1,DEF_VOLUME,300,5}, {0,255,0,1},
+  {1,DEF_VOLUME,300,5}, {0,255,0,1},
 };
 
 bool aud_init(void);

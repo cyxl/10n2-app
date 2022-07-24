@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include <time.h>
 #include <arch/board/board.h>
+#include <nuttx/arch.h>
 #include <sys/stat.h>
 #include <imu.h>
 #include <10n2_imu.h>
@@ -81,6 +82,18 @@ void *_imu_q_read(void *args)
     (void)args; /* Suppress -Wunused-parameter warning. */
     /* Initialize the queue attributes */
 
+    int cpu = up_cpu_index();
+    printf("IMU CPU %d\n", cpu);
+
+    sigset_t mask;
+    sigemptyset(&mask);
+    // TOOD 18
+    sigaddset(&mask, 18);
+    int ret = sigprocmask(SIG_BLOCK, &mask, NULL);
+    if (ret != OK)
+    {
+        printf("TF ERROR sigprocmask failed. %d\n", ret);
+    }
     /* Create the message queue. The queue reader is NONBLOCK. */
     mqd_t r_mq = mq_open(IMU_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, IMU_QUEUE_PERMS, &imu_attr_mq);
     char imu_buf[sizeof(struct vel_gyro_s)];
@@ -100,7 +113,6 @@ void *_imu_q_read(void *args)
     ssize_t bytes_read;
     char buffer[IMU_QUEUE_MSGSIZE];
     struct timespec poll_sleep;
-    // TODO make size configurable
 
     while (imu_running)
     {
@@ -118,7 +130,7 @@ void *_imu_q_read(void *args)
                 nanosleep(&del_sleep, NULL);
                 current_pmu = get_mpu_data((int16_t *)imu_buf);
                 record_imu_sample(current_pmu);
-                        //dump_data(current_pmu);
+                // dump_data(current_pmu);
             }
         }
         else
@@ -156,8 +168,14 @@ bool imu_init(void)
 {
     printf("imu init\n");
     imu_running = true;
-    pthread_create(&imu_th_consumer, NULL, &_imu_q_read, NULL);
+    cpu_set_t cpuset = 1 << 1;
+    int rc = pthread_setaffinity_np(imu_th_consumer, sizeof(cpu_set_t), &cpuset);
+    if (rc != 0)
+    {
+        printf("Unable set CPU affinity : %d", rc);
+    }
 
+    pthread_create(&imu_th_consumer, NULL, &_imu_q_read, NULL);
     return true;
 }
 

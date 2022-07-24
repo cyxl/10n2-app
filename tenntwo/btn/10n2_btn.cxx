@@ -12,13 +12,14 @@
 #include <time.h>
 #include <arch/board/board.h>
 #include <arch/chip/pin.h>
+#include <nuttx/arch.h>
 #include <sys/stat.h>
 #include <10n2_btn.h>
 #include <10n2_aud.h>
 
-#define BTN_LONG_HOLD 120
-#define BTN_REALLY_SHORT_HOLD 5
-#define BTN_SHORT_HOLD 50
+#define BTN_LONG_HOLD 24
+#define BTN_REALLY_SHORT_HOLD 1
+#define BTN_SHORT_HOLD 10
 #define BTN_DOWN 0
 #define BTN_UP 1
 
@@ -86,12 +87,14 @@ void *_btn_q_read(void *args)
 {
     (void)args; /* Suppress -Wunused-parameter warning. */
 
+   int cpu = up_cpu_index();
+    printf("Button CPU %d\n",cpu);
     uint32_t hold_cnt = 0;
     int last_val = 0;
 
     struct timespec del_sleep
     {
-        0, (int)(1 * 1e6)
+        0, (int)(50 * 1e6)
     };
 
     bool menu_selecting = false;
@@ -99,13 +102,14 @@ void *_btn_q_read(void *args)
     {
         int val = board_gpio_read(PIN_PWM0);
 
+        nanosleep(&del_sleep, NULL);
         if (val == BTN_DOWN && val == last_val)
         {
             hold_cnt++;
             if (hold_cnt >= BTN_LONG_HOLD)
             {
                 // menu toggle
-                printf("menu!\n");
+                printf("menu!\n %d",hold_cnt);
                 toggle_menu();
                 menu_selecting = true;
                 hold_cnt = 0;
@@ -131,7 +135,6 @@ void *_btn_q_read(void *args)
             menu_selecting = false;
             hold_cnt = 0;
         }
-        nanosleep(&del_sleep, NULL);
         last_val = val;
     }
     return NULL;
@@ -157,6 +160,12 @@ bool btn_init(void)
     }
     btn_running = true;
     board_gpio_intconfig(PIN_PWM0, INT_HIGH_LEVEL, false, btn_handler);
+    cpu_set_t cpuset = 1 << 3;
+    int rc =  pthread_setaffinity_np(btn_th_consumer,sizeof(cpu_set_t),&cpuset);
+    if (rc != 0)
+    {
+        printf("Unable set CPU affinity : %d",rc);
+    }
     pthread_create(&btn_th_consumer, NULL, &_btn_q_read, NULL);
     //  board_gpio_int(PIN_PWM0, true);
     return true;
