@@ -3,8 +3,8 @@
 
 #include <math.h>
 
-
-double distance_on_geoid(double lat1, double lon1, double lat2, double lon2) {
+double distance_on_geoid(double lat1, double lon1, double lat2, double lon2)
+{
     // Convert degrees to radians
     lat1 = lat1 * M_PI / 180.0;
     lon1 = lon1 * M_PI / 180.0;

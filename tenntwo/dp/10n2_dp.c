@@ -29,11 +29,11 @@ float current_z_stdev;
 #define YSLOPE_MIN -100
 #define XSLOPE_MAX 200
 #define XSLOPE_MIN -200
-#define ZSLOPE_MAX 200
-#define ZSLOPE_MIN -200
-#define ZSTDEV_MAX 100
+#define ZSLOPE_MAX 50
+#define ZSLOPE_MIN -50
+#define ZSTDEV_MAX 300
 
-#define CLEAR_BIT 19
+#define CLEAR_BIT 10
 
 uint32_t current_imu_bit = 0;
 
@@ -96,8 +96,10 @@ void *_dp_run(void *args)
     }
     while (dp_running)
     {
-        if (cnt++ % CLEAR_BIT)
+        if ((cnt++ % CLEAR_BIT) == 0)
+        {
             current_imu_bit = 0;
+        }
 
         nanosleep(&poll_sleep, NULL);
 

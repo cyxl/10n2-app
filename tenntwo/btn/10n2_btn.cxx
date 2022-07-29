@@ -87,8 +87,9 @@ void *_btn_q_read(void *args)
 {
     (void)args; /* Suppress -Wunused-parameter warning. */
 
-   int cpu = up_cpu_index();
-    printf("Button CPU %d\n",cpu);
+    int cpu = up_cpu_index();
+    printf("Button CPU %d\n", cpu);
+
     uint32_t hold_cnt = 0;
     int last_val = 0;
 
@@ -109,7 +110,7 @@ void *_btn_q_read(void *args)
             if (hold_cnt >= BTN_LONG_HOLD)
             {
                 // menu toggle
-                printf("menu!\n %d",hold_cnt);
+                printf("menu!\n %d", hold_cnt);
                 toggle_menu();
                 menu_selecting = true;
                 hold_cnt = 0;
@@ -120,7 +121,7 @@ void *_btn_q_read(void *args)
             printf("cnt %i\n", hold_cnt);
             if (menu_selecting)
             {
-                //noop
+                // noop
             }
             else if (hold_cnt <= BTN_REALLY_SHORT_HOLD)
             {
@@ -139,11 +140,6 @@ void *_btn_q_read(void *args)
     }
     return NULL;
 }
-static int btn_handler(int irq, FAR void *context, FAR void *arg)
-{
-    /* Interrupt handler */
-    printf("pushed!\n");
-}
 
 bool btn_init(void)
 {
@@ -156,18 +152,16 @@ bool btn_init(void)
     }
     else
     {
-        printf("we good\n");
+        printf("gio configured\n");
     }
     btn_running = true;
-    board_gpio_intconfig(PIN_PWM0, INT_HIGH_LEVEL, false, btn_handler);
     cpu_set_t cpuset = 1 << 3;
-    int rc =  pthread_setaffinity_np(btn_th_consumer,sizeof(cpu_set_t),&cpuset);
+    int rc = pthread_setaffinity_np(btn_th_consumer, sizeof(cpu_set_t), &cpuset);
     if (rc != 0)
     {
-        printf("Unable set CPU affinity : %d",rc);
+        printf("Unable set CPU affinity : %d", rc);
     }
     pthread_create(&btn_th_consumer, NULL, &_btn_q_read, NULL);
-    //  board_gpio_int(PIN_PWM0, true);
     return true;
 }
 

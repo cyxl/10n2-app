@@ -49,6 +49,7 @@ CFLAGS += -I$(UTIL_SRC_DIR)
 CFLAGS += -I$(REC_SRC_DIR)
 CFLAGS += -I$(MODEL_SRC_DIR)
 CFLAGS += -DSPRESENSE_CONFIG_H="\"/home/bstaley/git/spresense/nuttx/include/nuttx/config.h\"" 
+CFLAGS += -DEI_CLASSIFIER_TFLITE_ENABLE_CMSIS_NN=1
 
 CFLAGS += -I$(TOPDIR)/arch/arm/src/cxd56xx/
 CFLAGS += -DNDEBUG					# Disable assert() macro
@@ -57,7 +58,8 @@ CFLAGS += -DNDEBUG					# Disable assert() macro
 CXXFLAGS += -I$(SDKDIR)/../externals/tensorflow/tflite-micro-spresense-examples-1.0.0/third_party/flatbuffers/include/
 # TF
 CXXFLAGS += -I$(SDKDIR)/../externals/tensorflow/tflite-micro-spresense-examples-1.0.0/tensorflow/lite/micro/spresense/
-CXXFLAGS += -DSPRESENSE_CONFIG_H="\"/home/bstaley/git/spresense/nuttx/include/nuttx/config.h\"" -D_U -D_L -D_N -D_X -D_S -D_P -D_B -D_C
+CXXFLAGS += -DSPRESENSE_CONFIG_H="\"/home/bstaley/git/spresense/nuttx/include/nuttx/config.h\"" 
+#CXXFLAGS += -D_U -D_L -D_N -D_X -D_S -D_P -D_B -D_C
 CXXFLAGS += -I$(TF_SRC_DIR)
 CXXFLAGS += -I$(GNSS_SRC_DIR)
 CXXFLAGS += -I$(IMU_SRC_DIR)
@@ -70,6 +72,7 @@ CXXFLAGS += -I$(UTIL_SRC_DIR)
 CXXFLAGS += -I$(MENU_HDLR_SRC_DIR)
 CXXFLAGS += -I$(REC_SRC_DIR)
 CXXFLAGS += -I$(MODEL_SRC_DIR)
+CXXFLAGS += -DEI_CLASSIFIER_TFLITE_ENABLE_CMSIS_NN=1
 
 CXXFLAGS += -DNDEBUG					# Disable assert() macro
 

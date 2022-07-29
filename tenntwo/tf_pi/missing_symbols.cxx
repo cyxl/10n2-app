@@ -15,3 +15,7 @@ namespace std
     printf("Length Error :%s\n", e);
   }
 }
+void DebugLog(const char *s)
+{
+  printf("TF BWS Debug %s\n", s);
+}

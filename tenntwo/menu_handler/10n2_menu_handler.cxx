@@ -25,25 +25,25 @@
 #include <10n2_rec.h>
 #include <10n2_dp.h>
 
-#define INF_CONF .6
+#define INF_CONF .4
 
 static bool menu_handler_running = true;
 
 static pthread_t menu_handler_th;
 
-struct tf_req tf_r = {2, 0};
-struct cam_req cam_nowrite_bw_r = {1, 900, 192, 12, 288, 108, 0, ""};
-struct cam_req cam_hands_bw_r = {2, 0, 192, 12, 288, 108, 0, "hds"};
-struct cam_req cam_cell_bw_r = {2, 0, 192, 12, 288, 108, 0, "cell"};
-struct cam_req cam_none_bw_r = {2, 0, 192, 12, 288, 108, 0, "none"};
+struct tf_req tf_r = {1, 0};
+struct cam_req cam_nowrite_bw_r = {1, 0, 192, 12, 288, 108, 0, ""};
+struct cam_req cam_hands_bw_r = {1, 0, 192, 12, 288, 108, 0, "hds"};
+struct cam_req cam_cell_bw_r = {1, 0, 192, 12, 288, 108, 0, "cell"};
+struct cam_req cam_none_bw_r = {1, 0, 192, 12, 288, 108, 0, "none"};
 struct rec_req rec_open_verbose_r = {0, 0, rec_open, rec_verbose, 0};
 struct rec_req rec_open_terse_r = {0, 0, rec_open, rec_terse, 0};
 struct rec_req rec_close_r = {0, 0, rec_close, rec_verbose, 0}; // dont care type
 struct rec_req rec_verbose_r = {1, 0, rec_write, rec_verbose, 0};
 struct rec_req rec_terse_r = {1, 0, rec_write, rec_terse, 0};
 
-#define CAM_PERIOD 40
-#define INF_PERIOD 40
+#define CAM_PERIOD 50
+#define INF_PERIOD 50
 
 #define WARN_WAIT 100
 
@@ -101,7 +101,6 @@ void update_service(uint8_t last_submenu, uint32_t tick)
         }
         if ((tick % INF_PERIOD) == 0)
         {
-            printf("inferring \n");
             send_cam_req(cam_nowrite_bw_r);
             send_tf_req(tf_r);
 
@@ -128,6 +127,10 @@ void update_service(uint8_t last_submenu, uint32_t tick)
                 case TF_NOHANDS:
                     printf("NOHANDS %f\n", current_conf);
                     send_aud_seq(tf_none_j, TF_NONE_J_LEN);
+                    break;
+                case TF_BAD:
+                    printf("BAD %f\n", current_conf);
+                    send_aud_seq(tf_bad_j, TF_BAD_J_LEN);
                     break;
                 default:
                     break;
@@ -161,7 +164,7 @@ void update_service(uint8_t last_submenu, uint32_t tick)
         else if ((current_imu_bit & POTHOLE_BIT) && ((tick - pothole_warn_time) > WARN_WAIT))
         {
             printf("r stdev\n %f", current_x_stdev);
-            send_aud_seq(pothole_j, POTHOLE_J_LEN);
+            //TODOsend_aud_seq(pothole_j, POTHOLE_J_LEN);
             pothole_warn_time = tick;
         }
     }
@@ -174,15 +177,6 @@ void *_menu_run(void *args)
     int cpu = up_cpu_index();
     printf("MENU CPU %d\n", cpu);
 
-    sigset_t mask;
-    sigemptyset(&mask);
-    // TOOD 18
-    sigaddset(&mask, 18);
-    int ret = sigprocmask(SIG_BLOCK, &mask, NULL);
-    if (ret != OK)
-    {
-        printf("TF ERROR sigprocmask failed. %d\n", ret);
-    }
     uint8_t last_menu = 0;
     uint8_t last_submenu = 0;
 

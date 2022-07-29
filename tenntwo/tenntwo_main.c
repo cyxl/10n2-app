@@ -25,15 +25,10 @@ int tenntwo_main(int argc, char *argv[])
 {
 
   printf("TNT start\n");
-  boardctl(BOARDIOC_INIT, 0);
 
-  struct imu_req imu_r = {1e6, 50}; 
+  struct imu_req imu_r = {1e6, 50};
   struct gnss_req gnss_r = {1e6, 500};
-  struct tf_req tf_r = {200, 0};
 
-  int cpu = up_cpu_index();
-  printf("MAIN CPU %d\n",cpu);
-  printf("NUM CPUS%d\n",CONFIG_SMP_NCPUS);
   aud_init();
   imu_init();
   gnss_init();

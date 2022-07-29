@@ -100,7 +100,7 @@ bool send_aud_seq(aud_req *req, uint8_t len)
 bool send_aud_beep(bool en, int16_t vol, uint16_t freq, uint32_t dur)
 {
   aud_req r = {en, vol, freq, dur};
-  mqd_t mq = mq_open(AUD_QUEUE_NAME, O_WRONLY);
+  mqd_t mq = mq_open(AUD_QUEUE_NAME, O_WRONLY | O_NONBLOCK);
   if (mq < 0)
   {
     fprintf(stderr, "[aud sender]: Error, cannot open the queue: %s.\n", strerror(errno));

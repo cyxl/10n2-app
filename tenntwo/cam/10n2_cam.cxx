@@ -45,16 +45,6 @@ void *_cam_q_read(void *args)
     int cpu = up_cpu_index();
     printf("CAM CPU %d\n", cpu);
 
-    sigset_t mask;
-    sigemptyset(&mask);
-    // TOOD 18
-    sigaddset(&mask, 18);
-    int ret = sigprocmask(SIG_BLOCK, &mask, NULL);
-    if (ret != OK)
-    {
-        printf("CAM ERROR sigprocmask failed. %d\n", ret);
-    }
-
     /* Create the message queue. The queue reader is NONBLOCK. */
     mqd_t r_mq = mq_open(CAM_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, CAM_QUEUE_PERMS, &cam_attr_mq);
     futil_initialize();
@@ -72,8 +62,9 @@ void *_cam_q_read(void *args)
     char buffer[CAM_QUEUE_MSGSIZE];
     char namebuf[128];
     char dirbuf[128];
-    struct timespec poll_sleep;
-    // TODO make size configurable
+    uint16_t current_x0, current_y0, current_x1, current_y1 = 0;
+
+    timespec poll_sleep;
 
     while (cam_running)
     {
@@ -82,9 +73,16 @@ void *_cam_q_read(void *args)
         cam_req *r = (cam_req *)buffer;
         if (bytes_read >= 0)
         {
-            camera_init(r->clip_x0, r->clip_y0, r->clip_x1, r->clip_y1);
+            if (
+                current_x0 != r->clip_x0 |
+                current_y0 != r->clip_y0 |
+                current_x1 != r->clip_x1 |
+                current_y1 != r->clip_y1 )
+            {
+                camera_teardown();
+                camera_init(r->clip_x0, r->clip_y0, r->clip_x1, r->clip_y1);
+            }
             unsigned curr_time = (unsigned)time(NULL);
-            // uint32_t bufsize = r->width * r->height * (r->color?2:1);
             uint16_t width = (r->clip_x1 - r->clip_x0);
             uint16_t height = (r->clip_y1 - r->clip_y0);
             uint32_t bufsize = width * height * (r->color ? 2 : 1);
@@ -96,10 +94,12 @@ void *_cam_q_read(void *args)
                 bzero(dirbuf, 128);
                 printf("getting image \n");
                 cam_wait();
-                printf("done waiting\n");
-                getimage(buf, r->clip_x0, r->clip_y0, r->clip_x1, r->clip_y1, r->color);
+                int rc = getimage(buf, r->clip_x0, r->clip_y0, r->clip_x1, r->clip_y1, r->color);
                 cam_release();
-                send_aud_seq(cam_cap_j, CAM_CAPTURE_J_LEN);
+                if (rc == OK)
+                {
+                    send_aud_seq(cam_cap_j, CAM_CAPTURE_J_LEN);
+                }
 
                 if (strlen(r->dir) > 0)
                 {
@@ -111,13 +111,12 @@ void *_cam_q_read(void *args)
                         printf("ERROR creating image \n");
                     }
                 }
-                struct timespec aud_sleep
+                struct timespec cam_sleep
                 {
                     r->delay / 1000, (r->delay % 1000) * 1e6
                 };
-                nanosleep(&aud_sleep, NULL);
+                nanosleep(&cam_sleep, NULL);
             }
-            camera_teardown();
             free(buf);
         }
         else
@@ -136,7 +135,7 @@ void *_cam_q_read(void *args)
 
 bool send_cam_req(struct cam_req req)
 {
-    mqd_t mq = mq_open(CAM_QUEUE_NAME, O_WRONLY);
+    mqd_t mq = mq_open(CAM_QUEUE_NAME, O_WRONLY | O_NONBLOCK);
     if (mq < 0)
     {
         fprintf(stderr, "[cam sender]: Error, cannot open the queue: %s.\n", strerror(errno));
@@ -153,7 +152,7 @@ bool send_cam_req(struct cam_req req)
 
 bool cam_init(void)
 {
-    printf("bws cam init\n");
+    printf("cam init\n");
     cam_running = true;
     cpu_set_t cpuset = 1 << 4;
     int rc = pthread_setaffinity_np(cam_th_consumer, sizeof(cpu_set_t), &cpuset);

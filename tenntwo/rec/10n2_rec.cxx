@@ -4,6 +4,7 @@
  ****************************************************************************/
 
 #include <stdio.h>
+#include<vector>
 #include <stdlib.h>
 #include <pthread.h>
 #include <mqueue.h>
@@ -35,8 +36,141 @@ static pthread_t rec_th;
 static struct mq_attr rec_attr_mq = REC_QUEUE_ATTR_INITIALIZER;
 
 #define POS_SAVE_DIR "/mnt/sd0/pos"
+#define KML_SAVE_DIR "/mnt/sd0/kml"
+
+#define KML_NUM_POINTS_IN_SEGMENT 10
+
+const char *TNT_KML_HEADER =
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
+    "<kml xmlns=\"http://earth.google.com/kml/2.0\"> <Document>";
+
+const char *TNT_KML_FOOTER =
+    "</Document> </kml>";
+
+const char *TNT_KML_BAD_LINESTYLE =
+    "<Style id=\"BAD\">"
+    "<LineStyle>"
+    "<color>cf0000ff</color>"
+    "<width>8</width>"
+    "<gx:labelVisibility>1</gx:labelVisibility>"
+    "</LineStyle>"
+    "</Style>";
+
+const char *TNT_KML_WARN_LINESTYLE =
+    "<Style id=\"WARN\">"
+    "<LineStyle>"
+    "<color>cf00cfff</color>"
+    "<width>8</width>"
+    "<gx:labelVisibility>1</gx:labelVisibility>"
+    "</LineStyle>"
+    "</Style>";
+
+const char *TNT_KML_GOOD_LINESTYLE =
+    "<Style id=\"GOOD\">"
+    "<LineStyle>"
+    "<color>cfff0000</color>"
+    "<width>8</width>"
+    "<gx:labelVisibility>1</gx:labelVisibility>"
+    "</LineStyle>"
+    "</Style>";
+
+const char *TNT_KML_ROUTE_PLACEMARK_HEADER =
+    "<Placemark>"
+    "<styleUrl>%s</styleUrl>"
+    "<MultiGeometry>"
+    "<LineString>"
+    "<extrude>1</extrude>"
+    "<tessellate>1</tessellate>"
+    "<coordinates>";
+
+const char *TNT_KML_ROUTE_PLACEMARK_FOOTER =
+    "</coordinates>"
+    "</LineString>"
+    "</MultiGeometry>"
+    "</Placemark>";
+
+const char *TNT_KML_POINT_PLACEMARK_HEADER =
+    "<Placemark>"
+    "<Point>"
+    "<coordinates>%lf,%lf"
+    "</coordinates>"
+    "</Point>"
+    "<ExtendedData>";
+
+const char *TNT_KML_POINT_PLACEMARK_FOOTER =
+    "</ExtendedData>"
+    "</Placemark>";
+
+const char *TNT_KML_EXTENDED_DATA =
+    "<Data name=\"%s\">"
+    "<value>%i</value>"
+    "</Data>";
+const char* TNT_KML_SINGLE_POINT = 
+"%lf,%lf\n";
 
 FILE *pos_pf = NULL;
+FILE *kml_pf = NULL;
+
+const char* BAD_STYLE = "BAD";
+const char* WARN_STYLE = "WARN";
+const char* GOOD_STYLE = "GOOD";
+const char* VNAME_CELL = "Cell";
+const char* VNAME_NOHANDS = "No Hands";
+const char* VNAME_BADHANDS = "Bad Hands";
+const char* VNAME_ACCEL = "Accel";
+const char* VNAME_DECEL = "Decel";
+const char* VNAME_LEFT = "Left";
+const char* VNAME_RIGHT = "Right";
+const char* VNAME_POTHOLE = "Pot Hole";
+
+#define KML_NO_COORD 12345.
+
+uint32_t kml_current_seg_cnt = 0;
+uint32_t kml_current_geo_cnt = 0;
+float kml_current_seg_score = 100.;
+std::vector<struct gnss_data> gnss_points;
+
+#define V_CELL 0
+#define V_NOHANDS 1
+#define V_BADHANDS 2
+#define V_ACCEL 3
+#define V_DECEL 4
+#define V_LEFT 5
+#define V_RIGHT 6
+#define V_POTHOLE 7
+#define V_NUM 8
+
+uint16_t violations[V_NUM] = {0};
+
+void write_kml_fd(const char *s,int n,...)
+{
+    va_list args;
+    va_start(args,n);
+    if (kml_pf != NULL)
+    {
+        fprintf(kml_pf, s,args);
+        fflush(kml_pf);
+    }
+    va_end(args);
+}
+void write_kml_fd_si(const char *f,const char *s,int i)
+{
+    if (kml_pf != NULL)
+    {
+        fprintf(kml_pf, f,s,i);
+        fflush(kml_pf);
+    }
+}
+
+void write_kml_fd_ff(const char *fmt,float f,float f2)
+{
+    if (kml_pf != NULL)
+    {
+        fprintf(kml_pf, fmt,f,f2);
+        fflush(kml_pf);
+    }
+}
+
 void close_pos_fd()
 {
     if (pos_pf != NULL)
@@ -50,6 +184,23 @@ void close_pos_fd()
             printf("success!  closed pos output file\n");
         }
         pos_pf = NULL;
+    }
+}
+void close_kml_fd()
+{
+    if (kml_pf != NULL)
+    {
+        fprintf(kml_pf, TNT_KML_FOOTER);
+        fflush(kml_pf);
+        if (fclose(kml_pf) != 0)
+        {
+            printf("Unable to close kml file! :%s\n", strerror(errno));
+        }
+        else
+        {
+            printf("success!  closed kml output file\n");
+        }
+        kml_pf = NULL;
     }
 }
 
@@ -83,6 +234,57 @@ void open_pos_fd(uint8_t cnt, bool verbose)
     fflush(pos_pf);
 }
 
+void open_kml_fd()
+{
+
+    if (kml_pf != NULL)
+    {
+        printf("Closing open file\n");
+        close_kml_fd();
+    }
+    unsigned curr_time = clock();
+    char namebuf[128];
+    snprintf(namebuf, 128, "%s/10n2-report-%i.%s", KML_SAVE_DIR, curr_time, "kml");
+    printf("opening :%s\n", namebuf);
+    kml_pf = fopen(namebuf, "wb+");
+    if (kml_pf == NULL)
+    {
+        printf("Unable to open kml! :%s\n", strerror(errno));
+    }
+    else
+    {
+        printf("success!  opened kml output file\n");
+    }
+
+    kml_current_seg_cnt = 0;
+    kml_current_geo_cnt = 0;
+    for (int i = 0; i < V_NUM; i++)
+        violations[i] = 0;
+
+    gnss_points.clear();
+    write_kml_fd(TNT_KML_HEADER,0);
+    write_kml_fd(TNT_KML_WARN_LINESTYLE,0);
+    write_kml_fd(TNT_KML_BAD_LINESTYLE,0);
+    write_kml_fd(TNT_KML_GOOD_LINESTYLE,0);
+    fflush(kml_pf);
+}
+
+float calculate_violation_score(float scale)
+{
+    float calc_violations = 0;
+
+    calc_violations = violations[V_CELL] * 10;
+    calc_violations += violations[V_NOHANDS] * 5;
+    calc_violations += violations[V_BADHANDS] * 5;
+    calc_violations += violations[V_ACCEL] * 1;
+    calc_violations += violations[V_DECEL] * 1;
+    calc_violations += violations[V_LEFT] * 1;
+    calc_violations += violations[V_RIGHT] * 1;
+    calc_violations += violations[V_POTHOLE] * 1;
+
+    return calc_violations * scale;
+}
+
 void *_rec_run(void *args)
 {
     (void)args; /* Suppress -Wunused-parameter warning. */
@@ -90,15 +292,6 @@ void *_rec_run(void *args)
     int cpu = up_cpu_index();
     printf("REC CPU %d\n", cpu);
 
-    sigset_t mask;
-    sigemptyset(&mask);
-    // TOOD 18
-    sigaddset(&mask, 18);
-    int ret = sigprocmask(SIG_BLOCK, &mask, NULL);
-    if (ret != OK)
-    {
-        printf("TF ERROR sigprocmask failed. %d\n", ret);
-    }
     mqd_t r_mq = mq_open(REC_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, REC_QUEUE_PERMS, &rec_attr_mq);
     if (r_mq < 0)
     {
@@ -124,10 +317,12 @@ void *_rec_run(void *args)
             if (r->act == rec_open)
             {
                 open_pos_fd(r->f_id, r->type == rec_verbose);
+                open_kml_fd();
             }
             else if (r->act == rec_close)
             {
                 close_pos_fd();
+                close_kml_fd();
             }
             else
             {
@@ -190,6 +385,71 @@ void *_rec_run(void *args)
                     }
                 }
             }
+            if (current_inf == TF_CELL)
+                violations[V_CELL] += 1;
+            if (current_inf == TF_NOHANDS)
+                violations[V_NOHANDS] += 1;
+            if (current_inf == TF_BAD)
+                violations[V_BADHANDS] += 1;
+            if (current_imu_bit & ACCEL_BIT)
+                violations[V_ACCEL] += 1;
+            if (current_imu_bit & DECEL_BIT)
+                violations[V_DECEL] += 1;
+            if (current_imu_bit & LEFT_BIT)
+                violations[V_LEFT] += 1;
+            if (current_imu_bit & RIGHT_BIT)
+                violations[V_RIGHT] += 1;
+            if (current_imu_bit & POTHOLE_BIT)
+                violations[V_POTHOLE] += 1;
+
+            // KML
+            kml_current_seg_cnt += 1;
+            if (current_gnss.data_exists)
+            {
+                gnss_points.push_back(current_gnss);
+                printf("got gnss %i %s\n", current_gnss.type,VNAME_ACCEL);
+                kml_current_geo_cnt += 1;
+
+                if ((kml_current_geo_cnt % KML_NUM_POINTS_IN_SEGMENT) == 0)
+                {
+                    float violation_score = calculate_violation_score(1 / kml_current_seg_cnt);
+                    kml_current_seg_cnt = 0;
+                    float score = 100 - violation_score;
+
+                    if (score < 50.)
+                    {
+                        write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER,BAD_STYLE,0);
+                    }
+                    else if (score < 70.)
+                    {
+                        write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER,WARN_STYLE,0);
+                    }
+                    else
+                    {
+                        write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER,GOOD_STYLE,0);
+                    }
+
+                    for (struct gnss_data gd : gnss_points)
+                    {
+                        write_kml_fd_ff(TNT_KML_SINGLE_POINT,gd.longitude,gd.latitude);
+                    }
+                    write_kml_fd(TNT_KML_ROUTE_PLACEMARK_FOOTER,0);
+
+                    write_kml_fd_ff(TNT_KML_POINT_PLACEMARK_HEADER,gnss_points.back().longitude,gnss_points.back().latitude);
+
+                    write_kml_fd_si(TNT_KML_EXTENDED_DATA,VNAME_CELL,violations[V_CELL]);
+                    write_kml_fd_si(TNT_KML_EXTENDED_DATA,VNAME_NOHANDS,violations[V_NOHANDS]);
+                    write_kml_fd_si(TNT_KML_EXTENDED_DATA,VNAME_BADHANDS,violations[V_BADHANDS]);
+                    write_kml_fd_si(TNT_KML_EXTENDED_DATA,VNAME_ACCEL, violations[V_ACCEL]);
+                    write_kml_fd_si(TNT_KML_EXTENDED_DATA,VNAME_DECEL, violations[V_DECEL]);
+                    write_kml_fd_si(TNT_KML_EXTENDED_DATA,VNAME_LEFT,violations[V_LEFT]);
+                    write_kml_fd_si(TNT_KML_EXTENDED_DATA,VNAME_RIGHT,violations[V_RIGHT]);
+                    write_kml_fd_si(TNT_KML_EXTENDED_DATA,VNAME_POTHOLE,violations[V_POTHOLE]);
+
+                    write_kml_fd(TNT_KML_POINT_PLACEMARK_FOOTER,0);
+                    gnss_points.erase(gnss_points.begin(),gnss_points.end()-1);
+                }
+            }
         }
         else
         {
@@ -204,7 +464,7 @@ void *_rec_run(void *args)
 
 bool send_rec_req(struct rec_req req)
 {
-    mqd_t mq = mq_open(REC_QUEUE_NAME, O_WRONLY);
+    mqd_t mq = mq_open(REC_QUEUE_NAME, O_WRONLY | O_NONBLOCK);
     if (mq < 0)
     {
         fprintf(stderr, "[rec sender]: Error, cannot open the queue: %s.\n", strerror(errno));
@@ -223,7 +483,7 @@ bool rec_init(void)
     printf("menu handler init\n");
     rec_running = true;
 
-    cpu_set_t cpuset = 1 << 3;
+    cpu_set_t cpuset = 1 << 5;
     int rc = pthread_setaffinity_np(rec_th, sizeof(cpu_set_t), &cpuset);
     if (rc != 0)
     {

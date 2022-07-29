@@ -24,8 +24,6 @@
 #define POLL_FD_NUM 1
 #define POLL_TIMEOUT_FOREVER -1
 
-static struct cxd56_gnss_positiondata_s posdat;
-
 static bool gnss_running = true;
 #define GNSS_QUEUE_NAME "/gnss_queue" /* Queue name. */
 #define GNSS_QUEUE_PERMS ((int)(0644))
@@ -38,7 +36,8 @@ static bool gnss_running = true;
 static struct mq_attr gnss_attr_mq = GNSS_QUEUE_ATTR_INITIALIZER;
 static pthread_t gnss_th_consumer;
 
-struct cxd56_gnss_positiondata_s current_gnss;
+struct cxd56_gnss_positiondata_s received_gnss;
+struct gnss_data current_gnss;
 
 static struct pollfd g_fds[GNSS_POLL_FD_NUM] = {{0}};
 
@@ -55,11 +54,11 @@ void *_gnss_q_read(void *args)
   mqd_t r_mq = mq_open(GNSS_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, GNSS_QUEUE_PERMS, &gnss_attr_mq);
   if (r_mq < 0)
   {
-    fprintf(stderr, "[CONSUMER]: Error, cannot open the queue: %s.\n", strerror(errno));
+    fprintf(stderr, "[GNSS CONSUMER]: Error, cannot open the queue: %s.\n", strerror(errno));
     return NULL;
   }
 
-  printf("[CONSUMER]: Queue opened, queue descriptor: %d.\n", r_mq);
+  printf("[GNSS CONSUMER]: Queue opened, queue descriptor: %d.\n", r_mq);
 
   unsigned int prio;
   ssize_t bytes_read;
@@ -71,14 +70,25 @@ void *_gnss_q_read(void *args)
   if (gnss_fd < 0)
   {
     printf("open error:%d,%d\n", gnss_fd, errno);
-    return -ENODEV;
+    return NULL;
   }
 
-  int ret = ioctl(gnss_fd, CXD56_GNSS_IOCTL_START, CXD56_GNSS_STMOD_HOT);
+  int ret = gnss_setparams(gnss_fd);
+  if (ret < 0)
+  {
+    printf("set GNSS parms ERROR %d\n", errno);
+    return NULL;
+  }
+  else
+  {
+    printf("set GNSS parms OK\n");
+  }
+
+  ret = ioctl(gnss_fd, CXD56_GNSS_IOCTL_START, CXD56_GNSS_STMOD_HOT);
   if (ret < 0)
   {
     printf("start GNSS ERROR %d\n", errno);
-    return false;
+    return NULL;
   }
   else
   {
@@ -110,13 +120,13 @@ void *_gnss_q_read(void *args)
         {
           /* Read pos data. */
 
-          ret = read(gnss_fd, &current_gnss, sizeof(current_gnss));
+          ret = read(gnss_fd, &received_gnss, sizeof(received_gnss));
           if (ret < 0)
           {
             printf("Error read position data\n");
             break;
           }
-          else if (ret != sizeof(current_gnss))
+          else if (ret != sizeof(received_gnss))
           {
             ret = ERROR;
             printf("Size error read position data\n");
@@ -124,22 +134,25 @@ void *_gnss_q_read(void *args)
           }
           else
           {
+            to_gnss(&received_gnss,&current_gnss);
             ret = OK;
           }
 
           printf("UTC time : Hour:%d, minute:%d, sec:%d\n",
-                 current_gnss.receiver.time.hour, current_gnss.receiver.time.minute,
-                 current_gnss.receiver.time.sec);
-          if (current_gnss.receiver.pos_dataexist)
+                 received_gnss.receiver.time.hour, received_gnss.receiver.time.minute,
+                 received_gnss.receiver.time.sec);
+          if (received_gnss.receiver.pos_dataexist)
           {
             /* Detect position. */
-            printf("## POSITION: LAT %ld, LNG %ld \n", current_gnss.receiver.latitude,current_gnss.receiver.longitude);
-            send_aud_seq(gnss_jingle,GNSS_JINGLE_LEN);
-            break;
+            //ioctl(gnss_fd, CXD56_GNSS_IOCTL_SAVE_BACKUP_DATA, 0);
+
+            printf("## POSITION: LAT %f, LNG %f \n", current_gnss.latitude, current_gnss.longitude);
+            send_aud_seq(gnss_jingle, GNSS_JINGLE_LEN);
           }
           else
           {
-            printf("## No Positioning Data\n");
+            //printf("## NO POSITION: sig level %f\n", received_gnss.sv->siglevel);
+            //printf("## No Positioning Data\n");
           }
         }
 
@@ -156,13 +169,12 @@ void *_gnss_q_read(void *args)
   printf("gnss cleaning mq\n");
   ret = ioctl(gnss_fd, CXD56_GNSS_IOCTL_STOP, 0);
   mq_close(r_mq);
-  // mq_unlink(GNSS_QUEUE_NAME);
   return NULL;
 }
 
 bool send_gnss_req(struct gnss_req req)
 {
-  mqd_t mq = mq_open(GNSS_QUEUE_NAME, O_WRONLY);
+  mqd_t mq = mq_open(GNSS_QUEUE_NAME, O_WRONLY | O_NONBLOCK);
   if (mq < 0)
   {
     fprintf(stderr, "[sender]: Error, cannot open the queue: %s.\n", strerror(errno));
@@ -180,7 +192,8 @@ bool send_gnss_req(struct gnss_req req)
 bool gnss_init(void)
 {
   printf("gnss init\n");
-  current_gnss.receiver.type = NO_TYPE;
+  received_gnss.receiver.type = NO_TYPE;
+  received_gnss.sv->type = NO_TYPE;
   gnss_running = true;
 
   cpu_set_t cpuset = 1 << 5;
@@ -202,154 +215,19 @@ bool gnss_teardown(void)
   return true;
 }
 
-void double_to_dmf(double x, struct cxd56_gnss_dms_s *dmf)
+
+int to_gnss( struct cxd56_gnss_positiondata_s* pos_data, struct gnss_data *gnss_data)
 {
-  int b;
-  int d;
-  int m;
-  double f;
-  double t;
-
-  if (x < 0)
-  {
-    b = 1;
-    x = -x;
-  }
-  else
-  {
-    b = 0;
-  }
-  d = (int)x; /* = floor(x), x is always positive */
-  t = (x - d) * 60;
-  m = (int)t; /* = floor(t), t is always positive */
-  f = (t - m) * 10000;
-
-  dmf->sign = b;
-  dmf->degree = d;
-  dmf->minute = m;
-  dmf->frac = f;
-}
-
-/****************************************************************************
- * Name: read_and_print()
- *
- * Description:
- *   Read and print POS data.
- *
- * Input Parameters:
- *   fd - File descriptor.
- *
- * Returned Value:
- *   Zero (OK) on success; Negative value on error.
- *
- * Assumptions/Limitations:
- *   none.
- *
- ****************************************************************************/
-
-int read_gnss(int fd, struct gnss_data *d)
-{
-  int ret;
-  ret = read(fd, &posdat, sizeof(posdat));
-  if (ret < 0)
-  {
-    printf("read error\n");
-  }
-  else if (ret != sizeof(posdat))
-  {
-    ret = ERROR;
-    printf("read size error\n");
-    goto _err;
-  }
-  else
-  {
-    ret = OK;
-  }
-
-  if (posdat.receiver.pos_fixmode != CXD56_GNSS_PVT_POSFIX_INVALID)
-  {
-    d->date = posdat.receiver.date;
-    d->time = posdat.receiver.time;
-    d->latitude = posdat.receiver.latitude;
-    d->longitude = posdat.receiver.longitude;
-    d->type = posdat.sv->type;
-    d->svid = posdat.sv->svid;
-    d->stat = posdat.sv->stat;
-    d->siglevel = posdat.sv->siglevel;
+    gnss_data->date = pos_data->receiver.date;
+    gnss_data->time = pos_data->receiver.time;
+    gnss_data->latitude = pos_data->receiver.latitude;
+    gnss_data->longitude = pos_data->receiver.longitude;
+    gnss_data->type = pos_data->sv->type;
+    gnss_data->svid = pos_data->sv->svid;
+    gnss_data->data_exists = pos_data->receiver.pos_dataexist;
+    gnss_data->stat = pos_data->sv->stat;
+    gnss_data->siglevel = pos_data->sv->siglevel;
     return OK;
-  }
-  else
-  {
-    return ERROR;
-  }
-
-_err:
-  return ret;
-}
-
-int read_and_print(int fd)
-{
-  int ret;
-  struct cxd56_gnss_dms_s dmf;
-
-  /* Read POS data. */
-
-  ret = read(fd, &posdat, sizeof(posdat));
-  if (ret < 0)
-  {
-    printf("read error\n");
-    goto _err;
-  }
-  else if (ret != sizeof(posdat))
-  {
-    ret = ERROR;
-    printf("read size error\n");
-    goto _err;
-  }
-  else
-  {
-    ret = OK;
-  }
-
-  /* Print POS data. */
-
-  /* Print time. */
-
-  printf(">Hour:%d, minute:%d, sec:%d, usec:%ld\n",
-         posdat.receiver.time.hour, posdat.receiver.time.minute,
-         posdat.receiver.time.sec, posdat.receiver.time.usec);
-  if (posdat.receiver.pos_fixmode != CXD56_GNSS_PVT_POSFIX_INVALID)
-  // if (posdat.sv->invalid_cause == 0)
-  {
-    /* 2D fix or 3D fix.
-     * Convert latitude and longitude into dmf format and print it. */
-
-    double_to_dmf(posdat.receiver.latitude, &dmf);
-    printf(">LAT %d.%d.%04ld\n", dmf.degree, dmf.minute, dmf.frac);
-
-    double_to_dmf(posdat.receiver.longitude, &dmf);
-    printf(">LNG %d.%d.%04ld\n", dmf.degree, dmf.minute, dmf.frac);
-
-    printf(">    type %i    \n", posdat.sv->type);
-    printf(">    svid %i    \n", posdat.sv->svid);
-    printf(">    stat %i    \n", posdat.sv->stat);
-    printf(">    siglevel %f    \n", posdat.sv->siglevel);
-    ret = 1; // posfix
-  }
-  else
-  {
-    /* No measurement. */
-
-    printf(">No Positioning Data\n");
-    //   printf(">    %i    \n",posdat.sv->invalid_cause);
-    //   printf(">    type %i    \n",posdat.sv->type);
-    //   printf(">    svid %i    \n",posdat.sv->svid);
-    //   printf(">    stat %i    \n",posdat.sv->stat);
-    //  printf(">    siglevel %f    \n",posdat.sv->siglevel);
-  }
-
-_err:
-  return ret;
 }
 
 /****************************************************************************

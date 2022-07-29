@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <nuttx/clock.h>
+#include <time.h>
 #include <nuttx/sched.h>
 #include <nuttx/arch.h>
 #include <10n2_cam.h>
@@ -19,6 +20,7 @@
 #include "model_metadata.h"
 
 // TF Includes
+#include <cmath>
 #include "tensorflow/lite/kernels/internal/tensor_ctypes.h"
 #include "tensorflow/lite/micro/micro_error_reporter.h"
 #include "tensorflow/lite/schema/schema_generated.h"
@@ -35,11 +37,6 @@ static bool tf_running = true;
 
 #define TF_QUEUE_POLL ((struct timespec){0, 10000000})
 
-#define CELL_CONF .7
-#define HANDS_CONF .7
-#define NONE_CONF .7
-#define INF_CONF .4
-
 uint8_t current_inf = TF_UNKNOWN;
 float current_conf = 0.;
 uint32_t current_time_tf = 0;
@@ -52,9 +49,13 @@ static TfLiteTensor *input = nullptr;
 static TfLiteTensor *output = nullptr;
 static tflite::ErrorReporter *er = new tflite::MicroErrorReporter();
 
-#define CELL_IDX 0
-#define HANDS_IDX 1
-#define NONE_IDX 2
+#define BAD_IDX 0
+#define CELL_IDX 1
+#define HANDS_IDX 2
+#define NONE_IDX 3
+static const int32_t iRedToGray = (int32_t)(0.299f * 65536.0f);
+static const int32_t iGreenToGray = (int32_t)(0.587f * 65536.0f);
+static const int32_t iBlueToGray = (int32_t)(0.114f * 65536.0f);
 
 // Globals, used for compatibility with Arduino-style sketches.
 namespace
@@ -62,14 +63,16 @@ namespace
     const tflite::Model *model = nullptr;
     tflite::MicroInterpreter *interpreter = nullptr;
     const uint32_t tnt_arena_size = EI_CLASSIFIER_TFLITE_ARENA_SIZE;
-    static uint8_t tnt_tensor_arena[tnt_arena_size];
+    static uint8_t tnt_tensor_arena[tnt_arena_size] ALIGN(16);
 } // namespace
+
+float to_f32(uint8_t pixel_grayscale)
+{
+    return (iRedToGray * pixel_grayscale) + (iGreenToGray * pixel_grayscale) + (iBlueToGray * pixel_grayscale);
+}
 
 int8_t quantize(uint8_t pixel_grayscale)
 {
-    static const int32_t iRedToGray = (int32_t)(0.299f * 65536.0f);
-    static const int32_t iGreenToGray = (int32_t)(0.587f * 65536.0f);
-    static const int32_t iBlueToGray = (int32_t)(0.114f * 65536.0f);
 
     // ITU-R 601-2 luma transform
     // see: https://pillow.readthedocs.io/en/stable/reference/Image.html#PIL.Image.Image.convert
@@ -109,7 +112,7 @@ bool model_init(void)
     }
 
     static tflite::AllOpsResolver resolver;
-    //   EI_TFLITE_RESOLVER
+    //EI_TFLITE_RESOLVER
 
     interpreter = new tflite::MicroInterpreter(model, resolver, tnt_tensor_arena, tnt_arena_size, er);
 
@@ -127,6 +130,10 @@ bool model_init(void)
     input = interpreter->input(0);
     output = interpreter->output(0);
 
+    printf("TF input type %i\n",input->type);
+    printf("TF input bytes %i\n",input->bytes);
+    printf("TF output type %i\n",output->type);
+
     return true;
 }
 
@@ -137,16 +144,7 @@ void *_tf_thread(void *args)
 
     int cpu = up_cpu_index();
     printf("TF CPU %d\n", cpu);
-
-    sigset_t mask;
-    sigemptyset(&mask);
-    //TOOD 18
-    sigaddset(&mask, 18);
-    int ret = sigprocmask(SIG_BLOCK, &mask, NULL);
-    if (ret != OK)
-    {
-        printf("TF ERROR sigprocmask failed. %d\n", ret);
-    }
+    time_t start_t,end_t; 
 
     /* Create the message queue. The queue reader is NONBLOCK. */
     mqd_t r_mq = mq_open(TF_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, TF_QUEUE_PERMS, &tf_attr_mq);
@@ -183,20 +181,21 @@ void *_tf_thread(void *args)
                 cam_wait();
                 for (int img_idx = 0; img_idx < 96 * 96; img_idx++)
                 {
-                    // d[i] = quantize(cell_test_data[i] & 0xff); // We only need first byte, bytes 1-3 all the same for gray
                     d[img_idx] = quantize(latest_img_buf[img_idx]);
                 }
                 cam_release();
-                // printf("done quant\n");
+                 //printf("done quant\n");
                 //   Run the model on this input and make sure it succeeds.
                 printf("=======================invoke\n");
+                time(&start_t);
                 if (kTfLiteOk != interpreter->Invoke())
                 {
                     printf("TF invoke failure!!!\n");
                     TF_LITE_REPORT_ERROR(er, "Invoke failed.");
                     continue;
                 }
-                printf("=======================done invoke\n");
+                time(&end_t);
+                printf("=======================done invoke %d ticks\n",end_t - start_t);
 
                 // for (int j = 0; j < num_classes; j++)
                 // {
@@ -222,7 +221,11 @@ void *_tf_thread(void *args)
                 current_conf = max_conf;
                 current_time_tf = clock();
 
-                if (max_idx == CELL_IDX)
+                if (max_idx == BAD_IDX)
+                {
+                    current_inf = TF_BAD;
+                }
+                else if (max_idx == CELL_IDX)
                 {
                     current_inf = TF_CELL;
                 }
@@ -244,7 +247,6 @@ void *_tf_thread(void *args)
             nanosleep(&poll_sleep, NULL);
         }
 
-        fflush(stdout);
     }
     printf("tf cleaning mq\n");
     mq_close(r_mq);
@@ -253,7 +255,7 @@ void *_tf_thread(void *args)
 
 bool send_tf_req(struct tf_req req)
 {
-    mqd_t mq = mq_open(TF_QUEUE_NAME, O_WRONLY);
+    mqd_t mq = mq_open(TF_QUEUE_NAME, O_WRONLY | O_NONBLOCK);
     if (mq < 0)
     {
         fprintf(stderr, "[tf sender]: Error, cannot open the queue: %s.\n", strerror(errno));
@@ -261,7 +263,7 @@ bool send_tf_req(struct tf_req req)
     }
     if (mq_send(mq, (char *)&req, TF_QUEUE_MSGSIZE, 1) < 0)
     {
-        fprintf(stderr, "[tf sender]: Error, cannot send: %i, %s.\n", errno, strerror(errno));
+        if (errno != 11) fprintf(stderr, "[tf sender]: Error, cannot send: %i, %s.\n", errno, strerror(errno));
     }
 
     mq_close(mq);

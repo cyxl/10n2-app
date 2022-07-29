@@ -85,28 +85,19 @@ void *_imu_q_read(void *args)
     int cpu = up_cpu_index();
     printf("IMU CPU %d\n", cpu);
 
-    sigset_t mask;
-    sigemptyset(&mask);
-    // TOOD 18
-    sigaddset(&mask, 18);
-    int ret = sigprocmask(SIG_BLOCK, &mask, NULL);
-    if (ret != OK)
-    {
-        printf("TF ERROR sigprocmask failed. %d\n", ret);
-    }
     /* Create the message queue. The queue reader is NONBLOCK. */
     mqd_t r_mq = mq_open(IMU_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, IMU_QUEUE_PERMS, &imu_attr_mq);
     char imu_buf[sizeof(struct vel_gyro_s)];
-    // Open IMU file
 
+    // Open IMU file
     int imu_fd;
     if (r_mq < 0)
     {
-        fprintf(stderr, "[CONSUMER]: Error, cannot open the queue: %s.\n", strerror(errno));
+        fprintf(stderr, "[IMU CONSUMER]: Error, cannot open the queue: %s.\n", strerror(errno));
         return NULL;
     }
 
-    printf("[CONSUMER]: Queue opened, queue descriptor: %d.\n", r_mq);
+    printf("[IMU CONSUMER]: Queue opened, queue descriptor: %d.\n", r_mq);
     imu_fd = open(IMU_DEVNAME, O_RDONLY);
 
     unsigned int prio;
@@ -123,11 +114,11 @@ void *_imu_q_read(void *args)
             for (int i = 0; i < r->num && imu_running; i++)
             {
                 read(imu_fd, &imu_buf, sizeof(struct vel_gyro_s));
-                struct timespec del_sleep
+                struct timespec imu_sleep
                 {
                     r->delay / 1000, (r->delay % 1000) * 1e6
                 };
-                nanosleep(&del_sleep, NULL);
+                nanosleep(&imu_sleep, NULL);
                 current_pmu = get_mpu_data((int16_t *)imu_buf);
                 record_imu_sample(current_pmu);
                 // dump_data(current_pmu);
@@ -143,13 +134,12 @@ void *_imu_q_read(void *args)
     }
     printf("imu cleaning mq\n");
     mq_close(r_mq);
-    // mq_unlink(IMU_QUEUE_NAME);
     return NULL;
 }
 
 bool send_imu_req(struct imu_req req)
 {
-    mqd_t mq = mq_open(IMU_QUEUE_NAME, O_WRONLY);
+    mqd_t mq = mq_open(IMU_QUEUE_NAME, O_WRONLY | O_NONBLOCK);
     if (mq < 0)
     {
         fprintf(stderr, "[sender]: Error, cannot open the queue: %s.\n", strerror(errno));
