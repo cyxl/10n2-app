@@ -42,6 +42,8 @@ extern uint8_t current_submenu;
 
 bool btn_init(void);
 bool btn_teardown(void);
+bool btn_wait(void);
+bool btn_release(void);
 
 #ifdef __cplusplus
 }

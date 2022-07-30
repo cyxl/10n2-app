@@ -26,12 +26,11 @@ float current_x_stdev;
 float current_y_stdev;
 float current_z_stdev;
 
-#define YSLOPE_MIN -100
-#define XSLOPE_MAX 200
-#define XSLOPE_MIN -200
-#define ZSLOPE_MAX 50
-#define ZSLOPE_MIN -50
-#define ZSTDEV_MAX 300
+#define YSLOPE_MAX 400
+#define YSLOPE_MIN -400
+#define ZSLOPE_MAX 150
+#define ZSLOPE_MIN -150
+#define XSTDEV_MAX 800
 
 #define CLEAR_BIT 10
 
@@ -81,19 +80,10 @@ void *_dp_run(void *args)
     (void)args; /* Suppress -Wunused-parameter warning. */
                 /* Initialize the queue attributes */
 
-    int cpu = up_cpu_index();
-    printf("DP CPU %d\n", cpu);
+    //int cpu = up_cpu_index();
+    //printf("DP CPU %d\n", cpu);
     struct timespec poll_sleep = {0, 100000000};
 
-    sigset_t mask;
-    sigemptyset(&mask);
-    // TOOD 18
-    sigaddset(&mask, 18);
-    int ret = sigprocmask(SIG_BLOCK, &mask, NULL);
-    if (ret != OK)
-    {
-        printf("TF ERROR sigprocmask failed. %d\n", ret);
-    }
     while (dp_running)
     {
         if ((cnt++ % CLEAR_BIT) == 0)
@@ -101,7 +91,7 @@ void *_dp_run(void *args)
             current_imu_bit = 0;
         }
 
-        nanosleep(&poll_sleep, NULL);
+        usleep(10 * 1e3);
 
         float *acx = get_latest_imu_samples(0);
         float *acy = get_latest_imu_samples(1);
@@ -135,7 +125,7 @@ void *_dp_run(void *args)
             printf("==================right\n");
             current_imu_bit |= RIGHT_BIT;
         }
-        else if (current_x_stdev >= ZSTDEV_MAX)
+        else if (current_x_stdev >= XSTDEV_MAX)
         {
             printf("==================pothole\n");
             current_imu_bit |= POTHOLE_BIT;
@@ -149,13 +139,14 @@ bool dp_init(void)
 {
     printf("dp init\n");
     dp_running = true;
-    cpu_set_t cpuset = 1 << 3;
-    int rc = pthread_setaffinity_np(dp_th_consumer, sizeof(cpu_set_t), &cpuset);
+    pthread_create(&dp_th_consumer, NULL, &_dp_run, NULL);
+    cpu_set_t cpuset = 1 << 2;
+    int rc=0;
+    //rc= pthread_setaffinity_np(dp_th_consumer, sizeof(cpu_set_t), &cpuset);
     if (rc != 0)
     {
         printf("Unable set CPU affinity : %d", rc);
     }
-    pthread_create(&dp_th_consumer, NULL, &_dp_run, NULL);
 
     for (int i = 1; i <= IMU_SAMPLE_SIZE; i++)
         x_vals[i] = (float)i;

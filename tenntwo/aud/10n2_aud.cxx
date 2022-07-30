@@ -16,21 +16,233 @@
 static bool running = true;
 #define AUD_QUEUE_NAME "/aud_queue2" /* Queue name. */
 #define AUD_QUEUE_PERMS ((int)(0644))
-#define AUD_QUEUE_MAXMSG 64               /* Maximum number of messages. */
-#define AUD_QUEUE_MSGSIZE sizeof(aud_req) /* Length of message. */
+#define AUD_QUEUE_MAXMSG 64                       /* Maximum number of messages. */
+#define AUD_QUEUE_MSGSIZE sizeof(aud_jingle_type) /* Length of message. */
 #define AUD_QUEUE_ATTR_INITIALIZER ((struct mq_attr){AUD_QUEUE_MAXMSG, AUD_QUEUE_MSGSIZE, 0, 0})
-
-#define AUD_QUEUE_POLL ((struct timespec){0, 100000000})
 
 static struct mq_attr attr_mq = AUD_QUEUE_ATTR_INITIALIZER;
 static pthread_t th_consumer;
+
+mqd_t mq = 0;
+
+struct aud_data all_j[num_j][10] = {
+
+    {
+        // startup_j
+        {1, DEF_VOLUME, 400, 10},
+        {1, DEF_VOLUME, 500, 10},
+        {1, DEF_VOLUME, 600, 10},
+        {1, DEF_VOLUME, 600, 10},
+        {1, DEF_VOLUME, 300, 10},
+        {1, DEF_VOLUME, 300, 10},
+        {1, DEF_VOLUME, 600, 10},
+        {1, DEF_VOLUME, 500, 10},
+        {1, DEF_VOLUME, 400, 10},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // shutdown_j
+        {1, DEF_VOLUME, 300, 100},
+        {1, DEF_VOLUME, 600, 100},
+        {1, DEF_VOLUME, 600, 100},
+        {1, DEF_VOLUME, 500, 100},
+        {1, DEF_VOLUME, 400, 100},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // gnss
+        {1, DEF_VOLUME, 1900, 10},
+        {0, 255, 0, 0}, // off
+        {1, DEF_VOLUME, 2000, 20},
+        {0, 255, 0, 0}, // off
+        {1, DEF_VOLUME, 1900, 10},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // btn_on
+        {1, DEF_VOLUME, 1400, 10},
+        {0, 255, 0, 0}, // off
+        {1, DEF_VOLUME, 1600, 0},
+        {0, 255, 0, 10}, // off
+        {1, DEF_VOLUME, 1400, 0},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // btn_menu_1
+        {1, DEF_VOLUME, 700, 150},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // btn_menu_2
+        {1, DEF_VOLUME, 700, 150},
+        {0, 255, 0, 40}, // off
+        {1, DEF_VOLUME, 700, 150},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // btn_menu_3
+        {1, DEF_VOLUME, 700, 150},
+        {0, 255, 0, 40}, // off
+        {1, DEF_VOLUME, 700, 150},
+        {0, 255, 0, 40}, // off
+        {1, DEF_VOLUME, 700, 150},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // btn_menu_4
+        {1, DEF_VOLUME, 700, 150},
+        {0, 255, 0, 40}, // off
+        {1, DEF_VOLUME, 700, 150},
+        {0, 255, 0, 40}, // off
+        {1, DEF_VOLUME, 700, 150},
+        {0, 255, 0, 0}, // off
+        {1, DEF_VOLUME, 700, 150},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // btn_submenu_1
+        {1, DEF_VOLUME, 900, 100},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // btn_submenu_2
+        {1, DEF_VOLUME, 900, 100},
+        {0, 255, 0, 20}, // off
+        {1, DEF_VOLUME, 900, 100},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // btn_submenu_3
+        {1, DEF_VOLUME, 900, 100},
+        {0, 255, 0, 20}, // off
+        {1, DEF_VOLUME, 900, 100},
+        {0, 255, 0, 20}, // off
+        {1, DEF_VOLUME, 900, 100},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // btn_submenu_4
+        {1, DEF_VOLUME, 900, 100},
+        {0, 255, 0, 20}, // off
+        {1, DEF_VOLUME, 900, 100},
+        {0, 255, 0, 20}, // off
+        {1, DEF_VOLUME, 900, 100},
+        {0, 255, 0, 20}, // off
+        {1, DEF_VOLUME, 900, 100},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // btn_submenu_5
+        {1, DEF_VOLUME, 900, 100},
+        {0, 255, 0, 20}, // off
+        {1, DEF_VOLUME, 900, 100},
+        {0, 255, 0, 20}, // off
+        {1, DEF_VOLUME, 900, 100},
+        {0, 255, 0, 20}, // off
+        {1, DEF_VOLUME, 900, 100},
+        {0, 255, 0, 20}, // off
+        {1, DEF_VOLUME, 900, 100},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // btn_err
+        {1, DEF_VOLUME, 300, 400},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // tf_bad
+        {1, DEF_VOLUME, 100, 120},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // tf_cell
+        {1, DEF_VOLUME, 100, 20},
+        {0, 255, 0, 1}, // off
+        {1, DEF_VOLUME, 100, 20},
+        {0, 255, 0, 1}, // off
+        {1, DEF_VOLUME, 100, 20},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // tf_none
+        {1, DEF_VOLUME, 200, 20},
+        {0, 255, 0, 0}, // off
+        {1, DEF_VOLUME, 200, 20},
+        {0, 255, 0, 0}, // off
+        {1, DEF_VOLUME, 200, 20},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // tf_hands
+        {1, DEF_VOLUME, 1800, 40},
+        {0, 255, 0, 0}, // off
+        {1, DEF_VOLUME, 1800, 40},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // tf_nohands
+        {1, DEF_VOLUME, 1500, 50},
+        {1, DEF_VOLUME, 300, 50},
+        {1, DEF_VOLUME, 1500, 50},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // cam_capture
+        {1, DEF_VOLUME, 1800, 10},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // imu_turn
+        {1, DEF_VOLUME, 1800, 50},
+        {0, 255, 0, 0},
+        {1, DEF_VOLUME, 1800, 50},
+        {0, 255, 0, 0},
+        {1, DEF_VOLUME, 300, 50},
+        {0, 255, 0, 0},
+        {1, DEF_VOLUME, 300, 50},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // imu_decel
+        {1, DEF_VOLUME, 1500, 50},
+        {1, DEF_VOLUME, 1200, 50},
+        {1, DEF_VOLUME, 900, 50},
+        {1, DEF_VOLUME, 600, 50},
+        {1, DEF_VOLUME, 300, 50},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // imu_accel
+        {1, DEF_VOLUME, 300, 50},
+        {1, DEF_VOLUME, 600, 50},
+        {1, DEF_VOLUME, 900, 50},
+        {1, DEF_VOLUME, 1200, 50},
+        {1, DEF_VOLUME, 1500, 50},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // imu_pothole
+        {1, DEF_VOLUME, 300, 5},
+        {0, 255, 0, 1},
+        {1, DEF_VOLUME, 300, 5},
+        {0, 255, 0, 1},
+        {1, DEF_VOLUME, 300, 5},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+    {
+        // short_pause 
+        {0, 255, 0, 10},
+        {0, 255, OFF_FREQ, 0}, // done
+    },
+
+};
 
 void *_q_read(void *args)
 {
   (void)args; /* Suppress -Wunused-parameter warning. */
   /* Initialize the queue attributes */
-  int cpu = up_cpu_index();
-  printf("aud CPU %d\n", cpu);
+  // int cpu = up_cpu_index();
+  // printf("aud CPU %d\n", cpu);
 
   sigset_t mask;
   sigemptyset(&mask);
@@ -61,25 +273,39 @@ void *_q_read(void *args)
   {
     memset(buffer, 0x00, sizeof(buffer));
     bytes_read = mq_receive(r_mq, buffer, AUD_QUEUE_MSGSIZE, &prio);
-    aud_req *r = (aud_req *)buffer;
+    aud_jingle_type *r = (aud_jingle_type *)buffer;
     if (bytes_read >= 0)
     {
-      aud_beep(r->en, r->vol, r->freq);
-      struct timespec aud_sleep
+      if (*r >= num_j)
       {
-        r->dur / 1000, (r->dur % 1000) * 1e6
-      };
-      nanosleep(&aud_sleep, NULL);
-      // off
-      aud_beep(0, 255, 0);
+        printf("ERROR - Jingle not recognized!\n");
+        continue;
+      }
+
+      aud_data *d = all_j[*r];
+
+      for (int j_idx = 0; j_idx <= JINGLE_MAXLEN; j_idx++)
+      {
+
+        if (d[j_idx].freq == OFF_FREQ)
+        {
+          aud_beep(0, 255, 0);
+          continue;
+        }
+        int rc = aud_beep(d[j_idx].en, d[j_idx].vol, d[j_idx].freq);
+        if (rc < 0)
+          printf("aud beep failed %i\n", rc);
+        usleep(d[j_idx].dur * 1e3);
+        // off
+        rc = aud_beep(0, 255, 0);
+        if (rc < 0)
+          printf("aud beep failed %i\n", rc);
+      }
     }
     else
     {
-      poll_sleep = AUD_QUEUE_POLL;
-      nanosleep(&poll_sleep, NULL);
+      usleep(10 * 1e3);
     }
-
-    fflush(stdout);
   }
   printf("aud cleaning mq\n");
   mq_close(r_mq);
@@ -87,26 +313,18 @@ void *_q_read(void *args)
   return NULL;
 }
 
-bool send_aud_seq(aud_req *req, uint8_t len)
+bool send_aud_seq(aud_jingle_type j)
 {
-
-  for (int i = 0; i < len; i++)
+  if (mq == 0)
   {
-    send_aud_beep(req[i].en, req[i].vol, req[i].freq, req[i].dur);
+    mq = mq_open(AUD_QUEUE_NAME, O_WRONLY | O_NONBLOCK);
+    if (mq < 0)
+    {
+      fprintf(stderr, "[aud sender]: Error, cannot open the queue: %s.\n", strerror(errno));
+      return false;
+    }
   }
-
-  return true;
-}
-bool send_aud_beep(bool en, int16_t vol, uint16_t freq, uint32_t dur)
-{
-  aud_req r = {en, vol, freq, dur};
-  mqd_t mq = mq_open(AUD_QUEUE_NAME, O_WRONLY | O_NONBLOCK);
-  if (mq < 0)
-  {
-    fprintf(stderr, "[aud sender]: Error, cannot open the queue: %s.\n", strerror(errno));
-    return false;
-  }
-  if (mq_send(mq, (char *)&r, AUD_QUEUE_MSGSIZE, 1) < 0)
+  if (mq_send(mq, (char *)&j, sizeof(aud_jingle_type), 1) < 0)
   {
     fprintf(stderr, "[aud sender]: Error, cannot send: %i, %s.\n", errno, strerror(errno));
   }
@@ -143,9 +361,10 @@ bool aud_init(void)
     return false;
   }
 
-  cpu_set_t cpuset = 1 << 3;
-  int rc = pthread_setaffinity_np(th_consumer, sizeof(cpu_set_t), &cpuset);
+  cpu_set_t cpuset = 1 << 2;
   pthread_create(&th_consumer, NULL, &_q_read, NULL);
+  int rc;
+  // rc = pthread_setaffinity_np(th_consumer, sizeof(cpu_set_t), &cpuset);
   if (rc != 0)
   {
     printf("Unable set CPU affinity : %d", rc);

@@ -47,7 +47,7 @@
 #define EI_CLASSIFIER_PROJECT_ID                 120504
 #define EI_CLASSIFIER_PROJECT_OWNER              "Stanton"
 #define EI_CLASSIFIER_PROJECT_NAME               "10n2"
-#define EI_CLASSIFIER_PROJECT_DEPLOY_VERSION     27
+#define EI_CLASSIFIER_PROJECT_DEPLOY_VERSION     34
 #define EI_CLASSIFIER_NN_INPUT_FRAME_SIZE        9216
 #define EI_CLASSIFIER_RAW_SAMPLE_COUNT           9216
 #define EI_CLASSIFIER_RAW_SAMPLES_PER_FRAME      1
@@ -56,7 +56,7 @@
 #define EI_CLASSIFIER_INPUT_HEIGHT               96
 #define EI_CLASSIFIER_INPUT_FRAMES               1
 #define EI_CLASSIFIER_INTERVAL_MS                1
-#define EI_CLASSIFIER_LABEL_COUNT                4
+#define EI_CLASSIFIER_LABEL_COUNT                3
 #define EI_CLASSIFIER_HAS_ANOMALY                0
 #define EI_CLASSIFIER_FREQUENCY                  0
 #define EI_CLASSIFIER_USE_QUANTIZED_DSP_BLOCK    0

@@ -173,6 +173,7 @@ static int init_video(uint16_t clip_hsize, uint16_t clip_vsize)
 
   if (video_initialize("/dev/video") != 0)
   {
+    printf("no video init\n");
     return -1;
   }
 
@@ -180,6 +181,7 @@ static int init_video(uint16_t clip_hsize, uint16_t clip_vsize)
   if (video_fd < 0)
   {
     video_uninitialize();
+    printf("no open dev video\n");
     return -1;
   }
 
@@ -189,6 +191,7 @@ static int init_video(uint16_t clip_hsize, uint16_t clip_vsize)
                        clip_hsize, clip_vsize);
   if (ret != OK)
   {
+    printf("no camera prep\n");
     close(video_fd);
     free(frame_mem);
     video_uninitialize();
@@ -219,6 +222,7 @@ void camera_alloc(uint16_t hsize, uint16_t vsize,
   /* Prepare video memory to store images */
 
   frame_mem = (unsigned char *)memalign(32, hsize * vsize * 2);
+
   if (!frame_mem)
   {
     return -1;
@@ -264,9 +268,10 @@ int getimage(unsigned char *out_data, uint16_t _x1, uint16_t _y1, uint16_t _x2, 
 
   uint16_t clip_hsize = _x2 - _x1;
   uint16_t clip_vsize = _y2 - _y1;
-  if (init_video(clip_hsize, clip_vsize) < 0)
+  int rc = init_video(clip_hsize, clip_vsize);
+  if (rc < 0)
   {
-    printf("init_video() is faled..\n");
+    printf("init_video() is failed..%i\n",rc);
     return -1;
   }
 

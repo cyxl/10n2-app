@@ -35,7 +35,6 @@ static bool tf_running = true;
 #define TF_QUEUE_MSGSIZE sizeof(tf_req) /* Length of message. */
 #define TF_QUEUE_ATTR_INITIALIZER ((struct mq_attr){TF_QUEUE_MAXMSG, TF_QUEUE_MSGSIZE, 0, 0})
 
-#define TF_QUEUE_POLL ((struct timespec){0, 10000000})
 
 uint8_t current_inf = TF_UNKNOWN;
 float current_conf = 0.;
@@ -49,10 +48,12 @@ static TfLiteTensor *input = nullptr;
 static TfLiteTensor *output = nullptr;
 static tflite::ErrorReporter *er = new tflite::MicroErrorReporter();
 
-#define BAD_IDX 0
-#define CELL_IDX 1
-#define HANDS_IDX 2
-#define NONE_IDX 3
+#define CELL_IDX 0
+#define HANDS_IDX 1
+#define NONE_IDX 2
+#define BAD_IDX 2
+#define NUM_CLASSES 3
+//#define NONE_IDX 3
 static const int32_t iRedToGray = (int32_t)(0.299f * 65536.0f);
 static const int32_t iGreenToGray = (int32_t)(0.587f * 65536.0f);
 static const int32_t iBlueToGray = (int32_t)(0.114f * 65536.0f);
@@ -112,6 +113,13 @@ bool model_init(void)
     }
 
     static tflite::AllOpsResolver resolver;
+ //   static tflite::MicroMutableOpResolver<5> resolver;
+ // resolver.AddConv2D();
+ // resolver.AddFullyConnected();
+ // resolver.AddBuiltin(tflite::BuiltinOperator_MAX_POOL_2D,
+  //                    tflite::ops::micro::Register_MAX_POOL_2D());
+ // resolver.AddReshape();
+ // resolver.AddSoftmax();
     //EI_TFLITE_RESOLVER
 
     interpreter = new tflite::MicroInterpreter(model, resolver, tnt_tensor_arena, tnt_arena_size, er);
@@ -130,10 +138,6 @@ bool model_init(void)
     input = interpreter->input(0);
     output = interpreter->output(0);
 
-    printf("TF input type %i\n",input->type);
-    printf("TF input bytes %i\n",input->bytes);
-    printf("TF output type %i\n",output->type);
-
     return true;
 }
 
@@ -142,8 +146,6 @@ void *_tf_thread(void *args)
     (void)args; /* Suppress -Wunused-parameter warning. */
     /* Initialize the queue attributes */
 
-    int cpu = up_cpu_index();
-    printf("TF CPU %d\n", cpu);
     time_t start_t,end_t; 
 
     /* Create the message queue. The queue reader is NONBLOCK. */
@@ -160,7 +162,6 @@ void *_tf_thread(void *args)
     ssize_t bytes_read;
     char buffer[TF_QUEUE_MSGSIZE];
     struct timespec poll_sleep;
-    static const int num_classes = 3;
 
     while (tf_running)
     {
@@ -170,10 +171,6 @@ void *_tf_thread(void *args)
         {
             int8_t *d = tflite::GetTensorData<int8>(input);
             int8_t *od = tflite::GetTensorData<int8>(output);
-            struct timespec del_sleep
-            {
-                r->delay / 1000, (r->delay % 1000) * 1e6
-            };
             for (int i = 0; i < r->num && tf_running; i++)
             {
 
@@ -186,7 +183,7 @@ void *_tf_thread(void *args)
                 cam_release();
                  //printf("done quant\n");
                 //   Run the model on this input and make sure it succeeds.
-                printf("=======================invoke\n");
+                //printf("=======================invoke\n");
                 time(&start_t);
                 if (kTfLiteOk != interpreter->Invoke())
                 {
@@ -195,7 +192,7 @@ void *_tf_thread(void *args)
                     continue;
                 }
                 time(&end_t);
-                printf("=======================done invoke %d ticks\n",end_t - start_t);
+                //printf("=======================done invoke %d ticks\n",end_t - start_t);
 
                 // for (int j = 0; j < num_classes; j++)
                 // {
@@ -206,7 +203,7 @@ void *_tf_thread(void *args)
                 float max_conf = 0;
                 int max_idx = -1;
 
-                for (int k = 0; k < num_classes; k++)
+                for (int k = 0; k < NUM_CLASSES; k++)
                 {
                     float conf = 0.;
                     conf = (od[k] - EI_CLASSIFIER_TFLITE_OUTPUT_ZEROPOINT) * EI_CLASSIFIER_TFLITE_OUTPUT_SCALE;
@@ -238,13 +235,12 @@ void *_tf_thread(void *args)
                     current_inf = TF_NOHANDS;
                 }
 
-                nanosleep(&del_sleep, NULL);
+                usleep(r->delay * 1e3);
             }
         }
         else
         {
-            poll_sleep = TF_QUEUE_POLL;
-            nanosleep(&poll_sleep, NULL);
+            usleep(100 * 1e3);
         }
 
     }
@@ -275,9 +271,10 @@ bool tf_pi_init(void)
     model_init();
     printf("done model init\n");
     tf_running = true;
-    cpu_set_t cpuset = 1 << 2;
-    int rc = pthread_setaffinity_np(tf_th_consumer, sizeof(cpu_set_t), &cpuset);
     pthread_create(&tf_th_consumer, NULL, &_tf_thread, NULL);
+    cpu_set_t cpuset = 1 << 4;
+    int rc;
+   // rc = pthread_setaffinity_np(tf_th_consumer, sizeof(cpu_set_t), &cpuset);
     if (rc != 0)
     {
         printf("Unable set CPU affinity : %d", rc);

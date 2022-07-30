@@ -30,44 +30,51 @@ static pthread_t btn_th_consumer;
 uint8_t current_menu = 0;
 uint8_t current_submenu = 0;
 
+pthread_mutex_t btn_mutex;
+
 void play_menu_jingle()
 {
     if (current_menu == top)
     {
-        send_aud_seq(btn_menu_1_j, BTN_MENU_1_J_LEN);
+        send_aud_seq(btn_menu_1);
     }
     else if (current_menu == inf)
     {
-        send_aud_seq(btn_menu_2_j, BTN_MENU_2_J_LEN);
+        send_aud_seq(btn_menu_2);
     }
     else if (current_menu == train)
     {
-        send_aud_seq(btn_menu_3_j, BTN_MENU_3_J_LEN);
+        send_aud_seq(btn_menu_3);
     }
 
+    send_aud_seq(short_pause);
+
     if ((int)current_submenu == 0)
-        send_aud_seq(btn_submenu_1_j, BTN_SUBMENU_1_J_LEN);
+        send_aud_seq(btn_submenu_1);
     else if ((int)current_submenu == 1)
-        send_aud_seq(btn_submenu_2_j, BTN_SUBMENU_2_J_LEN);
+        send_aud_seq(btn_submenu_2);
     else if ((int)current_submenu == 2)
-        send_aud_seq(btn_submenu_3_j, BTN_SUBMENU_3_J_LEN);
+        send_aud_seq(btn_submenu_3);
     else if ((int)current_submenu == 3)
-        send_aud_seq(btn_submenu_4_j, BTN_SUBMENU_4_J_LEN);
+        send_aud_seq(btn_submenu_4);
     else if ((int)current_submenu == 4)
-        send_aud_seq(btn_submenu_5_j, BTN_SUBMENU_5_J_LEN);
+        send_aud_seq(btn_submenu_5);
     else
-        send_aud_seq(btn_err_j, BTN_ERR_J_LEN);
+        send_aud_seq(btn_err);
 }
 
 void toggle_menu()
 {
+    btn_wait();
     current_menu = (current_menu + 1) % num_menu;
     current_submenu = 0;
+    btn_release();
     play_menu_jingle();
 }
 
 void toggle_submenu()
 {
+    btn_wait();
     if (current_menu == top)
     {
         current_submenu = (current_submenu + 1) % num_top_menu;
@@ -80,6 +87,7 @@ void toggle_submenu()
     {
         current_submenu = (current_submenu + 1) % num_train_menu;
     }
+    btn_release();
     play_menu_jingle();
 }
 
@@ -87,23 +95,18 @@ void *_btn_q_read(void *args)
 {
     (void)args; /* Suppress -Wunused-parameter warning. */
 
-    int cpu = up_cpu_index();
-    printf("Button CPU %d\n", cpu);
+    //int cpu = up_cpu_index();
+    //printf("Button CPU %d\n", cpu);
 
     uint32_t hold_cnt = 0;
     int last_val = 0;
 
-    struct timespec del_sleep
-    {
-        0, (int)(50 * 1e6)
-    };
-
     bool menu_selecting = false;
     while (btn_running)
     {
+        usleep(50 * 1e3);
         int val = board_gpio_read(PIN_PWM0);
 
-        nanosleep(&del_sleep, NULL);
         if (val == BTN_DOWN && val == last_val)
         {
             hold_cnt++;
@@ -155,13 +158,21 @@ bool btn_init(void)
         printf("gio configured\n");
     }
     btn_running = true;
-    cpu_set_t cpuset = 1 << 3;
-    int rc = pthread_setaffinity_np(btn_th_consumer, sizeof(cpu_set_t), &cpuset);
+    cpu_set_t cpuset = 1 << 2;
+    pthread_create(&btn_th_consumer, NULL, &_btn_q_read, NULL);
+    int rc;
+    //rc = pthread_setaffinity_np(btn_th_consumer, sizeof(cpu_set_t), &cpuset);
+
     if (rc != 0)
     {
         printf("Unable set CPU affinity : %d", rc);
     }
-    pthread_create(&btn_th_consumer, NULL, &_btn_q_read, NULL);
+
+    if (0 != (errno = pthread_mutex_init(&btn_mutex, NULL)))
+    {
+        perror("pthread_mutex_init() failed");
+        return EXIT_FAILURE;
+    }
     return true;
 }
 
@@ -172,4 +183,13 @@ bool btn_teardown(void)
     board_gpio_int(PIN_PWM0, false);
     pthread_join(btn_th_consumer, NULL);
     return true;
+}
+
+bool btn_wait(void)
+{
+    return 0 == pthread_mutex_lock(&btn_mutex);
+}
+bool btn_release(void)
+{
+    return 0 == pthread_mutex_unlock(&btn_mutex);
 }

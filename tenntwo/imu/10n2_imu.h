@@ -9,7 +9,7 @@ extern "C" {
 #include <imu_data.h>
 
 #define IMU_BUF_SIZE 35
-#define IMU_SAMPLE_SIZE 10
+#define IMU_SAMPLE_SIZE 5 
 
 struct imu_req{
     uint32_t num;

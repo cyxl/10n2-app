@@ -30,8 +30,6 @@ static bool rec_running = true;
 #define REC_QUEUE_MSGSIZE sizeof(rec_req) /* Length of message. */
 #define REC_QUEUE_ATTR_INITIALIZER ((struct mq_attr){REC_QUEUE_MAXMSG, REC_QUEUE_MSGSIZE, 0, 0})
 
-#define REC_QUEUE_POLL ((struct timespec){0, 100000000})
-
 static pthread_t rec_th;
 static struct mq_attr rec_attr_mq = REC_QUEUE_ATTR_INITIALIZER;
 
@@ -310,10 +308,6 @@ void *_rec_run(void *args)
         rec_req *r = (rec_req *)buffer;
         if (bytes_read >= 0)
         {
-            struct timespec rec_sleep
-            {
-                r->delay / 1000, (r->delay % 1000) * 1e6
-            };
             if (r->act == rec_open)
             {
                 open_pos_fd(r->f_id, r->type == rec_verbose);
@@ -356,7 +350,7 @@ void *_rec_run(void *args)
                                 current_gnss.longitude);
                         int rc = fflush(pos_pf);
                         printf("recording verbose : %d!\n", rc);
-                        nanosleep(&rec_sleep, NULL);
+                        usleep(r->delay * 1e3);
                     }
                 }
                 else if (r->type == rec_terse)
@@ -381,7 +375,7 @@ void *_rec_run(void *args)
                                 current_gnss.longitude);
                         int rc = fflush(pos_pf);
                         printf("recording terse : %d!\n", rc);
-                        nanosleep(&rec_sleep, NULL);
+                        usleep(r->delay * 1e3);
                     }
                 }
             }
@@ -453,8 +447,7 @@ void *_rec_run(void *args)
         }
         else
         {
-            poll_sleep = REC_QUEUE_POLL;
-            nanosleep(&poll_sleep, NULL);
+            usleep(10 * 1e3);
         }
     }
     printf("rec cleaning mq\n");
@@ -483,13 +476,14 @@ bool rec_init(void)
     printf("menu handler init\n");
     rec_running = true;
 
-    cpu_set_t cpuset = 1 << 5;
-    int rc = pthread_setaffinity_np(rec_th, sizeof(cpu_set_t), &cpuset);
+    cpu_set_t cpuset = 1 << 3;
+    pthread_create(&rec_th, NULL, &_rec_run, NULL);
+    int rc;
+    //rc = pthread_setaffinity_np(rec_th, sizeof(cpu_set_t), &cpuset);
     if (rc != 0)
     {
         printf("Unable set CPU affinity : %d", rc);
     }
-    pthread_create(&rec_th, NULL, &_rec_run, NULL);
 
     return true;
 }

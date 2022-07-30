@@ -14,6 +14,7 @@
 #include <10n2_tf_pi.h>
 #include <10n2_menu_handler.h>
 #include <10n2_rec.h>
+#include <nuttx/arch.h>
 
 #include <sys/boardctl.h>
 
@@ -23,6 +24,7 @@ int main(int argc, FAR char *argv[])
 int tenntwo_main(int argc, char *argv[])
 #endif
 {
+ boardctl(BOARDIOC_INIT, 0);
 
   printf("TNT start\n");
 
@@ -39,20 +41,21 @@ int tenntwo_main(int argc, char *argv[])
   rec_init();
   menu_handler_init();
 
-  send_aud_seq(startup_jingle, STARTUP_JINGLE_LEN);
+  send_aud_seq(startup_j);
 
   send_imu_req(imu_r);
   send_gnss_req(gnss_r);
 
   while (1)
   {
-    //   send_gnss_req(gnss_r);
+    //send_gnss_req(gnss_r);
     nxsig_usleep(1 * 1e6); /* usecs (arbitrary) */
+    printf("zzzz....\n");
     if (current_menu == top && current_submenu == top_quit)
       break;
   }
 
-  send_aud_seq(shutdown_jingle, SHUTDOWN_JINGLE_LEN);
+  send_aud_seq(shutdown_j);
   dp_teardown();
   cam_teardown();
   gnss_teardown();

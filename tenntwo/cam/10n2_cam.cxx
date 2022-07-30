@@ -27,8 +27,6 @@ static bool cam_running = true;
 #define CAM_QUEUE_MSGSIZE sizeof(cam_req) /* Length of message. */
 #define CAM_QUEUE_ATTR_INITIALIZER ((struct mq_attr){CAM_QUEUE_MAXMSG, CAM_QUEUE_MSGSIZE, 0, 0})
 
-#define CAM_QUEUE_POLL ((struct timespec){0, 100000000})
-
 #define IMG_SAVE_DIR "/mnt/sd0/img"
 static struct mq_attr cam_attr_mq = CAM_QUEUE_ATTR_INITIALIZER;
 static pthread_t cam_th_consumer;
@@ -42,8 +40,8 @@ void *_cam_q_read(void *args)
     (void)args; /* Suppress -Wunused-parameter warning. */
     /* Initialize the queue attributes */
 
-    int cpu = up_cpu_index();
-    printf("CAM CPU %d\n", cpu);
+//    int cpu = up_cpu_index();
+ //   printf("CAM CPU %d\n", cpu);
 
     /* Create the message queue. The queue reader is NONBLOCK. */
     mqd_t r_mq = mq_open(CAM_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, CAM_QUEUE_PERMS, &cam_attr_mq);
@@ -77,7 +75,7 @@ void *_cam_q_read(void *args)
                 current_x0 != r->clip_x0 |
                 current_y0 != r->clip_y0 |
                 current_x1 != r->clip_x1 |
-                current_y1 != r->clip_y1 )
+                current_y1 != r->clip_y1)
             {
                 camera_teardown();
                 camera_init(r->clip_x0, r->clip_y0, r->clip_x1, r->clip_y1);
@@ -87,18 +85,22 @@ void *_cam_q_read(void *args)
             uint16_t height = (r->clip_y1 - r->clip_y0);
             uint32_t bufsize = width * height * (r->color ? 2 : 1);
             unsigned char *buf = (unsigned char *)memalign(32, bufsize);
+            if (buf == NULL)
+            {
+                printf("ERROR - unable to malloc buf\n");
+                break;
+            }
             latest_img_buf = buf;
             for (int i = 0; i < r->num; i++)
             {
                 bzero(namebuf, 128);
                 bzero(dirbuf, 128);
-                printf("getting image \n");
                 cam_wait();
                 int rc = getimage(buf, r->clip_x0, r->clip_y0, r->clip_x1, r->clip_y1, r->color);
                 cam_release();
                 if (rc == OK)
                 {
-                    send_aud_seq(cam_cap_j, CAM_CAPTURE_J_LEN);
+                    send_aud_seq(cam_capture);
                 }
 
                 if (strlen(r->dir) > 0)
@@ -111,18 +113,13 @@ void *_cam_q_read(void *args)
                         printf("ERROR creating image \n");
                     }
                 }
-                struct timespec cam_sleep
-                {
-                    r->delay / 1000, (r->delay % 1000) * 1e6
-                };
-                nanosleep(&cam_sleep, NULL);
+                usleep(r->delay * 1e3);
             }
             free(buf);
         }
         else
         {
-            poll_sleep = CAM_QUEUE_POLL;
-            nanosleep(&poll_sleep, NULL);
+            usleep(10 * 1e3);
         }
 
         fflush(stdout);
@@ -154,13 +151,14 @@ bool cam_init(void)
 {
     printf("cam init\n");
     cam_running = true;
-    cpu_set_t cpuset = 1 << 4;
-    int rc = pthread_setaffinity_np(cam_th_consumer, sizeof(cpu_set_t), &cpuset);
+    pthread_create(&cam_th_consumer, NULL, &_cam_q_read, NULL);
+    cpu_set_t cpuset = 1 << 3;
+    int rc=0;
+    //rc = pthread_setaffinity_np(cam_th_consumer, sizeof(cpu_set_t), &cpuset);
     if (rc != 0)
     {
         printf("Unable set CPU affinity : %d", rc);
     }
-    pthread_create(&cam_th_consumer, NULL, &_cam_q_read, NULL);
     if (0 != (errno = pthread_mutex_init(&cam_mutex, NULL)))
     {
         perror("pthread_mutex_init() failed");

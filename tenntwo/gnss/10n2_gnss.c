@@ -31,7 +31,6 @@ static bool gnss_running = true;
 #define GNSS_QUEUE_MSGSIZE sizeof(struct gnss_req) /* Length of message. */
 #define GNSS_QUEUE_ATTR_INITIALIZER ((struct mq_attr){GNSS_QUEUE_MAXMSG, GNSS_QUEUE_MSGSIZE, 0, 0})
 
-#define GNSS_QUEUE_POLL ((struct timespec){0, 100000000})
 
 static struct mq_attr gnss_attr_mq = GNSS_QUEUE_ATTR_INITIALIZER;
 static pthread_t gnss_th_consumer;
@@ -46,9 +45,8 @@ void *_gnss_q_read(void *args)
   (void)args; /* Suppress -Wunused-parameter warning. */
               /* Initialize the queue attributes */
 
-  int cpu = up_cpu_index();
-  printf("GNSS CPU %d\n", cpu);
-  struct timespec poll_sleep = {0, 100000000};
+  //int cpu = up_cpu_index();
+  //printf("GNSS CPU %d\n", cpu);
 
   /* Create the message queue. The queue reader is NONBLOCK. */
   mqd_t r_mq = mq_open(GNSS_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, GNSS_QUEUE_PERMS, &gnss_attr_mq);
@@ -147,7 +145,7 @@ void *_gnss_q_read(void *args)
             //ioctl(gnss_fd, CXD56_GNSS_IOCTL_SAVE_BACKUP_DATA, 0);
 
             printf("## POSITION: LAT %f, LNG %f \n", current_gnss.latitude, current_gnss.longitude);
-            send_aud_seq(gnss_jingle, GNSS_JINGLE_LEN);
+            send_aud_seq(gnss);
           }
           else
           {
@@ -156,14 +154,12 @@ void *_gnss_q_read(void *args)
           }
         }
 
-        struct timespec gnss_sleep = {r->delay / 1000, (r->delay % 1000) * 1e6};
-        nanosleep(&gnss_sleep, NULL);
+        usleep(r->delay * 1e3);
       }
     }
     else
     {
-      poll_sleep = GNSS_QUEUE_POLL;
-      nanosleep(&poll_sleep, NULL);
+      usleep(100 * 1e3);
     }
   }
   printf("gnss cleaning mq\n");
@@ -196,13 +192,15 @@ bool gnss_init(void)
   received_gnss.sv->type = NO_TYPE;
   gnss_running = true;
 
-  cpu_set_t cpuset = 1 << 5;
-  int rc = pthread_setaffinity_np(gnss_th_consumer, sizeof(cpu_set_t), &cpuset);
+  pthread_create(&gnss_th_consumer, NULL, &_gnss_q_read, NULL);
+  cpu_set_t cpuset = 1 << 2;
+
+  int rc;
+  //rc = pthread_setaffinity_np(gnss_th_consumer, sizeof(cpu_set_t), &cpuset);
   if (rc != 0)
   {
     printf("Unable set CPU affinity : %d", rc);
   }
-  pthread_create(&gnss_th_consumer, NULL, &_gnss_q_read, NULL);
 
   return true;
 }
