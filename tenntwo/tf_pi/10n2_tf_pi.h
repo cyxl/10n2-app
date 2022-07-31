@@ -7,11 +7,12 @@ extern "C"
 {
 #endif
 
-#define TF_UNKNOWN 0
-#define TF_HANDS 1
-#define TF_NOHANDS 2
-#define TF_CELL 3
-#define TF_BAD 4
+#define CELL_IDX 0
+#define HANDS_IDX 1
+#define NONE_IDX 2
+#define NUM_CLASSES 3
+#define BAD_IDX -1 
+#define UNKNOWN_IDX -42
 
 #include <stdint.h>
     struct tf_req

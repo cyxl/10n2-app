@@ -25,7 +25,7 @@
 #include <10n2_rec.h>
 #include <10n2_dp.h>
 
-#define INF_CONF .8
+#define INF_CONF 5.
 
 static bool menu_handler_running = true;
 
@@ -42,7 +42,7 @@ struct rec_req rec_close_r = {0, 0, rec_close, rec_verbose, 0}; // dont care typ
 struct rec_req rec_verbose_r = {1, 0, rec_write, rec_verbose, 0};
 struct rec_req rec_terse_r = {1, 0, rec_write, rec_terse, 0};
 
-#define CAM_PERIOD 80 
+#define CAM_TRAIN_PERIOD 10 
 #define INF_PERIOD 80
 
 #define WARN_WAIT 100
@@ -60,17 +60,17 @@ void update_service(uint8_t menu,uint8_t last_submenu, uint32_t tick)
     {
         if (current_submenu == cam_hands_on)
         {
-            if ((tick % CAM_PERIOD) == 0)
+            if ((tick % CAM_TRAIN_PERIOD) == 0)
                 send_cam_req(cam_hands_bw_r);
         }
         else if (current_submenu == cam_cell_on)
         {
-            if ((tick % CAM_PERIOD) == 0)
+            if ((tick % CAM_TRAIN_PERIOD) == 0)
                 send_cam_req(cam_cell_bw_r);
         }
         else if (current_submenu == cam_none_on)
         {
-            if ((tick % CAM_PERIOD) == 0)
+            if ((tick % CAM_TRAIN_PERIOD) == 0)
                 send_cam_req(cam_none_bw_r);
         }
     }
@@ -120,15 +120,15 @@ void update_service(uint8_t menu,uint8_t last_submenu, uint32_t tick)
             {
                 switch (current_inf)
                 {
-                case TF_CELL:
+                case CELL_IDX:
                     printf("CELL %f\n", current_conf);
                     send_aud_seq(tf_cell);
                     break;
-                case TF_NOHANDS:
+                case NONE_IDX:
                     printf("NOHANDS %f\n", current_conf);
                     send_aud_seq(tf_none);
                     break;
-                case TF_BAD:
+                case BAD_IDX:
                     printf("BAD %f\n", current_conf);
                     send_aud_seq(tf_bad);
                     break;
@@ -203,7 +203,7 @@ bool menu_handler_init(void)
     pthread_create(&menu_handler_th, NULL, &_menu_run, NULL);
     cpu_set_t cpuset = 1 << 2;
     int rc ;
-    //rc= pthread_setaffinity_np(menu_handler_th, sizeof(cpu_set_t), &cpuset);
+    rc= pthread_setaffinity_np(menu_handler_th, sizeof(cpu_set_t), &cpuset);
     if (rc != 0)
     {
         printf("Unable set CPU affinity : %d", rc);

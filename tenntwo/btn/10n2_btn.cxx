@@ -161,7 +161,7 @@ bool btn_init(void)
     cpu_set_t cpuset = 1 << 2;
     pthread_create(&btn_th_consumer, NULL, &_btn_q_read, NULL);
     int rc;
-    //rc = pthread_setaffinity_np(btn_th_consumer, sizeof(cpu_set_t), &cpuset);
+    rc = pthread_setaffinity_np(btn_th_consumer, sizeof(cpu_set_t), &cpuset);
 
     if (rc != 0)
     {

@@ -196,7 +196,7 @@ bool gnss_init(void)
   cpu_set_t cpuset = 1 << 2;
 
   int rc;
-  //rc = pthread_setaffinity_np(gnss_th_consumer, sizeof(cpu_set_t), &cpuset);
+  rc = pthread_setaffinity_np(gnss_th_consumer, sizeof(cpu_set_t), &cpuset);
   if (rc != 0)
   {
     printf("Unable set CPU affinity : %d", rc);

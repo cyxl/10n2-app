@@ -4,7 +4,7 @@
  ****************************************************************************/
 
 #include <stdio.h>
-#include<vector>
+#include <vector>
 #include <stdlib.h>
 #include <pthread.h>
 #include <mqueue.h>
@@ -103,23 +103,23 @@ const char *TNT_KML_EXTENDED_DATA =
     "<Data name=\"%s\">"
     "<value>%i</value>"
     "</Data>";
-const char* TNT_KML_SINGLE_POINT = 
-"%lf,%lf\n";
+const char *TNT_KML_SINGLE_POINT =
+    "%lf,%lf\n";
 
 FILE *pos_pf = NULL;
 FILE *kml_pf = NULL;
 
-const char* BAD_STYLE = "BAD";
-const char* WARN_STYLE = "WARN";
-const char* GOOD_STYLE = "GOOD";
-const char* VNAME_CELL = "Cell";
-const char* VNAME_NOHANDS = "No Hands";
-const char* VNAME_BADHANDS = "Bad Hands";
-const char* VNAME_ACCEL = "Accel";
-const char* VNAME_DECEL = "Decel";
-const char* VNAME_LEFT = "Left";
-const char* VNAME_RIGHT = "Right";
-const char* VNAME_POTHOLE = "Pot Hole";
+const char *BAD_STYLE = "BAD";
+const char *WARN_STYLE = "WARN";
+const char *GOOD_STYLE = "GOOD";
+const char *VNAME_CELL = "Cell";
+const char *VNAME_NOHANDS = "No Hands";
+const char *VNAME_BADHANDS = "Bad Hands";
+const char *VNAME_ACCEL = "Accel";
+const char *VNAME_DECEL = "Decel";
+const char *VNAME_LEFT = "Left";
+const char *VNAME_RIGHT = "Right";
+const char *VNAME_POTHOLE = "Pot Hole";
 
 #define KML_NO_COORD 12345.
 
@@ -140,31 +140,31 @@ std::vector<struct gnss_data> gnss_points;
 
 uint16_t violations[V_NUM] = {0};
 
-void write_kml_fd(const char *s,int n,...)
+void write_kml_fd(const char *s, int n, ...)
 {
     va_list args;
-    va_start(args,n);
+    va_start(args, n);
     if (kml_pf != NULL)
     {
-        fprintf(kml_pf, s,args);
+        fprintf(kml_pf, s, args);
         fflush(kml_pf);
     }
     va_end(args);
 }
-void write_kml_fd_si(const char *f,const char *s,int i)
+void write_kml_fd_si(const char *f, const char *s, int i)
 {
     if (kml_pf != NULL)
     {
-        fprintf(kml_pf, f,s,i);
+        fprintf(kml_pf, f, s, i);
         fflush(kml_pf);
     }
 }
 
-void write_kml_fd_ff(const char *fmt,float f,float f2)
+void write_kml_fd_ff(const char *fmt, float f, float f2)
 {
     if (kml_pf != NULL)
     {
-        fprintf(kml_pf, fmt,f,f2);
+        fprintf(kml_pf, fmt, f, f2);
         fflush(kml_pf);
     }
 }
@@ -260,10 +260,10 @@ void open_kml_fd()
         violations[i] = 0;
 
     gnss_points.clear();
-    write_kml_fd(TNT_KML_HEADER,0);
-    write_kml_fd(TNT_KML_WARN_LINESTYLE,0);
-    write_kml_fd(TNT_KML_BAD_LINESTYLE,0);
-    write_kml_fd(TNT_KML_GOOD_LINESTYLE,0);
+    write_kml_fd(TNT_KML_HEADER, 0);
+    write_kml_fd(TNT_KML_WARN_LINESTYLE, 0);
+    write_kml_fd(TNT_KML_BAD_LINESTYLE, 0);
+    write_kml_fd(TNT_KML_GOOD_LINESTYLE, 0);
     fflush(kml_pf);
 }
 
@@ -379,11 +379,11 @@ void *_rec_run(void *args)
                     }
                 }
             }
-            if (current_inf == TF_CELL)
+            if (current_inf == CELL_IDX)
                 violations[V_CELL] += 1;
-            if (current_inf == TF_NOHANDS)
+            if (current_inf == NONE_IDX)
                 violations[V_NOHANDS] += 1;
-            if (current_inf == TF_BAD)
+            if (current_inf == BAD_IDX)
                 violations[V_BADHANDS] += 1;
             if (current_imu_bit & ACCEL_BIT)
                 violations[V_ACCEL] += 1;
@@ -401,47 +401,51 @@ void *_rec_run(void *args)
             if (current_gnss.data_exists)
             {
                 gnss_points.push_back(current_gnss);
-                printf("got gnss %i %s\n", current_gnss.type,VNAME_ACCEL);
+                printf("got gnss %i %s\n", current_gnss.type, VNAME_ACCEL);
                 kml_current_geo_cnt += 1;
 
                 if ((kml_current_geo_cnt % KML_NUM_POINTS_IN_SEGMENT) == 0)
                 {
-                    float violation_score = calculate_violation_score(1 / kml_current_seg_cnt);
+                    float violation_score = calculate_violation_score(1. / kml_current_seg_cnt);
                     kml_current_seg_cnt = 0;
                     float score = 100 - violation_score;
 
                     if (score < 50.)
                     {
-                        write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER,BAD_STYLE,0);
+                        write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER, BAD_STYLE, 0);
                     }
                     else if (score < 70.)
                     {
-                        write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER,WARN_STYLE,0);
+                        write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER, WARN_STYLE, 0);
                     }
                     else
                     {
-                        write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER,GOOD_STYLE,0);
+                        write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER, GOOD_STYLE, 0);
                     }
 
                     for (struct gnss_data gd : gnss_points)
                     {
-                        write_kml_fd_ff(TNT_KML_SINGLE_POINT,gd.longitude,gd.latitude);
+                        write_kml_fd_ff(TNT_KML_SINGLE_POINT, gd.longitude, gd.latitude);
                     }
-                    write_kml_fd(TNT_KML_ROUTE_PLACEMARK_FOOTER,0);
+                    write_kml_fd(TNT_KML_ROUTE_PLACEMARK_FOOTER, 0);
 
-                    write_kml_fd_ff(TNT_KML_POINT_PLACEMARK_HEADER,gnss_points.back().longitude,gnss_points.back().latitude);
+                    write_kml_fd_ff(TNT_KML_POINT_PLACEMARK_HEADER, gnss_points.back().longitude, gnss_points.back().latitude);
 
-                    write_kml_fd_si(TNT_KML_EXTENDED_DATA,VNAME_CELL,violations[V_CELL]);
-                    write_kml_fd_si(TNT_KML_EXTENDED_DATA,VNAME_NOHANDS,violations[V_NOHANDS]);
-                    write_kml_fd_si(TNT_KML_EXTENDED_DATA,VNAME_BADHANDS,violations[V_BADHANDS]);
-                    write_kml_fd_si(TNT_KML_EXTENDED_DATA,VNAME_ACCEL, violations[V_ACCEL]);
-                    write_kml_fd_si(TNT_KML_EXTENDED_DATA,VNAME_DECEL, violations[V_DECEL]);
-                    write_kml_fd_si(TNT_KML_EXTENDED_DATA,VNAME_LEFT,violations[V_LEFT]);
-                    write_kml_fd_si(TNT_KML_EXTENDED_DATA,VNAME_RIGHT,violations[V_RIGHT]);
-                    write_kml_fd_si(TNT_KML_EXTENDED_DATA,VNAME_POTHOLE,violations[V_POTHOLE]);
+                    write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_CELL, violations[V_CELL]);
+                    write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_NOHANDS, violations[V_NOHANDS]);
+                    write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_BADHANDS, violations[V_BADHANDS]);
+                    write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_ACCEL, violations[V_ACCEL]);
+                    write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_DECEL, violations[V_DECEL]);
+                    write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_LEFT, violations[V_LEFT]);
+                    write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_RIGHT, violations[V_RIGHT]);
+                    write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_POTHOLE, violations[V_POTHOLE]);
 
-                    write_kml_fd(TNT_KML_POINT_PLACEMARK_FOOTER,0);
-                    gnss_points.erase(gnss_points.begin(),gnss_points.end()-1);
+                    write_kml_fd(TNT_KML_POINT_PLACEMARK_FOOTER, 0);
+                    gnss_points.erase(gnss_points.begin(), gnss_points.end() - 1);
+
+                    //clear violations
+                    for (int i = 0; i < V_NUM; i++)
+                        violations[i] = 0;
                 }
             }
         }
@@ -479,7 +483,7 @@ bool rec_init(void)
     cpu_set_t cpuset = 1 << 3;
     pthread_create(&rec_th, NULL, &_rec_run, NULL);
     int rc;
-    //rc = pthread_setaffinity_np(rec_th, sizeof(cpu_set_t), &cpuset);
+    rc = pthread_setaffinity_np(rec_th, sizeof(cpu_set_t), &cpuset);
     if (rc != 0)
     {
         printf("Unable set CPU affinity : %d", rc);

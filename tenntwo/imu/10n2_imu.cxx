@@ -155,7 +155,7 @@ bool imu_init(void)
     cpu_set_t cpuset = 1 << 2;
     pthread_create(&imu_th_consumer, NULL, &_imu_q_read, NULL);
     int rc;
-    //rc = pthread_setaffinity_np(imu_th_consumer, sizeof(cpu_set_t), &cpuset);
+    rc = pthread_setaffinity_np(imu_th_consumer, sizeof(cpu_set_t), &cpuset);
     if (rc != 0)
     {
         printf("Unable set CPU affinity : %d", rc);

@@ -154,7 +154,7 @@ bool cam_init(void)
     pthread_create(&cam_th_consumer, NULL, &_cam_q_read, NULL);
     cpu_set_t cpuset = 1 << 3;
     int rc=0;
-    //rc = pthread_setaffinity_np(cam_th_consumer, sizeof(cpu_set_t), &cpuset);
+    rc = pthread_setaffinity_np(cam_th_consumer, sizeof(cpu_set_t), &cpuset);
     if (rc != 0)
     {
         printf("Unable set CPU affinity : %d", rc);

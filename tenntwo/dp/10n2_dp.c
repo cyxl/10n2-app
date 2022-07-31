@@ -28,9 +28,9 @@ float current_z_stdev;
 
 #define YSLOPE_MAX 400
 #define YSLOPE_MIN -400
-#define ZSLOPE_MAX 150
-#define ZSLOPE_MIN -150
-#define XSTDEV_MAX 800
+#define ZSLOPE_MAX 250
+#define ZSLOPE_MIN -250
+#define XSTDEV_MAX 1800
 
 #define CLEAR_BIT 10
 
@@ -142,7 +142,7 @@ bool dp_init(void)
     pthread_create(&dp_th_consumer, NULL, &_dp_run, NULL);
     cpu_set_t cpuset = 1 << 2;
     int rc=0;
-    //rc= pthread_setaffinity_np(dp_th_consumer, sizeof(cpu_set_t), &cpuset);
+    rc= pthread_setaffinity_np(dp_th_consumer, sizeof(cpu_set_t), &cpuset);
     if (rc != 0)
     {
         printf("Unable set CPU affinity : %d", rc);

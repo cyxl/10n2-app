@@ -36,7 +36,7 @@ static bool tf_running = true;
 #define TF_QUEUE_ATTR_INITIALIZER ((struct mq_attr){TF_QUEUE_MAXMSG, TF_QUEUE_MSGSIZE, 0, 0})
 
 
-uint8_t current_inf = TF_UNKNOWN;
+uint8_t current_inf = UNKNOWN_IDX;
 float current_conf = 0.;
 uint32_t current_time_tf = 0;
 
@@ -48,11 +48,6 @@ static TfLiteTensor *input = nullptr;
 static TfLiteTensor *output = nullptr;
 static tflite::ErrorReporter *er = new tflite::MicroErrorReporter();
 
-#define CELL_IDX 0
-#define HANDS_IDX 1
-#define NONE_IDX 2
-#define BAD_IDX 2
-#define NUM_CLASSES 3
 //#define NONE_IDX 3
 static const int32_t iRedToGray = (int32_t)(0.299f * 65536.0f);
 static const int32_t iGreenToGray = (int32_t)(0.587f * 65536.0f);
@@ -112,14 +107,14 @@ bool model_init(void)
         return false;
     }
 
-    static tflite::AllOpsResolver resolver;
- //   static tflite::MicroMutableOpResolver<5> resolver;
- // resolver.AddConv2D();
- // resolver.AddFullyConnected();
- // resolver.AddBuiltin(tflite::BuiltinOperator_MAX_POOL_2D,
-  //                    tflite::ops::micro::Register_MAX_POOL_2D());
- // resolver.AddReshape();
- // resolver.AddSoftmax();
+ //   static tflite::AllOpsResolver resolver;
+    static tflite::MicroMutableOpResolver<5> resolver;
+  resolver.AddConv2D();
+  resolver.AddFullyConnected();
+  resolver.AddBuiltin(tflite::BuiltinOperator_MAX_POOL_2D,
+                    tflite::ops::micro::Register_MAX_POOL_2D());
+  resolver.AddReshape();
+  resolver.AddSoftmax();
     //EI_TFLITE_RESOLVER
 
     interpreter = new tflite::MicroInterpreter(model, resolver, tnt_tensor_arena, tnt_arena_size, er);
@@ -183,7 +178,7 @@ void *_tf_thread(void *args)
                 cam_release();
                  //printf("done quant\n");
                 //   Run the model on this input and make sure it succeeds.
-                //printf("=======================invoke\n");
+                printf("=======================invoke\n");
                 time(&start_t);
                 if (kTfLiteOk != interpreter->Invoke())
                 {
@@ -192,7 +187,7 @@ void *_tf_thread(void *args)
                     continue;
                 }
                 time(&end_t);
-                //printf("=======================done invoke %d ticks\n",end_t - start_t);
+                printf("=======================done invoke %d ticks\n",end_t - start_t);
 
                 // for (int j = 0; j < num_classes; j++)
                 // {
@@ -216,24 +211,9 @@ void *_tf_thread(void *args)
 
                 printf("infs %f %d\n", max_conf, max_idx);
                 current_conf = max_conf;
+                current_inf = max_idx;
                 current_time_tf = clock();
 
-                if (max_idx == BAD_IDX)
-                {
-                    current_inf = TF_BAD;
-                }
-                else if (max_idx == CELL_IDX)
-                {
-                    current_inf = TF_CELL;
-                }
-                else if (max_idx == HANDS_IDX)
-                {
-                    current_inf = TF_HANDS;
-                }
-                else if (max_idx == NONE_IDX)
-                {
-                    current_inf = TF_NOHANDS;
-                }
 
                 usleep(r->delay * 1e3);
             }
@@ -274,7 +254,7 @@ bool tf_pi_init(void)
     pthread_create(&tf_th_consumer, NULL, &_tf_thread, NULL);
     cpu_set_t cpuset = 1 << 4;
     int rc;
-   // rc = pthread_setaffinity_np(tf_th_consumer, sizeof(cpu_set_t), &cpuset);
+    rc = pthread_setaffinity_np(tf_th_consumer, sizeof(cpu_set_t), &cpuset);
     if (rc != 0)
     {
         printf("Unable set CPU affinity : %d", rc);

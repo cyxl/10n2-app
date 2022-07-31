@@ -165,11 +165,7 @@ struct aud_data all_j[num_j][10] = {
     },
     {
         // tf_none
-        {1, DEF_VOLUME, 200, 20},
-        {0, 255, 0, 0}, // off
-        {1, DEF_VOLUME, 200, 20},
-        {0, 255, 0, 0}, // off
-        {1, DEF_VOLUME, 200, 20},
+        {1, DEF_VOLUME, 100, 60},
         {0, 255, OFF_FREQ, 0}, // done
     },
     {
@@ -364,7 +360,7 @@ bool aud_init(void)
   cpu_set_t cpuset = 1 << 2;
   pthread_create(&th_consumer, NULL, &_q_read, NULL);
   int rc;
-  // rc = pthread_setaffinity_np(th_consumer, sizeof(cpu_set_t), &cpuset);
+  rc = pthread_setaffinity_np(th_consumer, sizeof(cpu_set_t), &cpuset);
   if (rc != 0)
   {
     printf("Unable set CPU affinity : %d", rc);
