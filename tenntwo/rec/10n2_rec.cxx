@@ -45,10 +45,19 @@ const char *TNT_KML_HEADER =
 const char *TNT_KML_FOOTER =
     "</Document> </kml>";
 
+const char *TNT_KML_FAIL_LINESTYLE =
+    "<Style id=\"FAIL\">"
+    "<LineStyle>"
+    "<color>cf0000ff</color>"
+    "<width>8</width>"
+    "<gx:labelVisibility>1</gx:labelVisibility>"
+    "</LineStyle>"
+    "</Style>";
+
 const char *TNT_KML_BAD_LINESTYLE =
     "<Style id=\"BAD\">"
     "<LineStyle>"
-    "<color>cf0000ff</color>"
+    "<color>cf0080ff</color>"
     "<width>8</width>"
     "<gx:labelVisibility>1</gx:labelVisibility>"
     "</LineStyle>"
@@ -66,12 +75,20 @@ const char *TNT_KML_WARN_LINESTYLE =
 const char *TNT_KML_GOOD_LINESTYLE =
     "<Style id=\"GOOD\">"
     "<LineStyle>"
-    "<color>cfff0000</color>"
+    "<color>cf33cc33</color>"
     "<width>8</width>"
     "<gx:labelVisibility>1</gx:labelVisibility>"
     "</LineStyle>"
     "</Style>";
 
+const char *TNT_KML_EXCEPTIONAL_LINESTYLE =
+    "<Style id=\"GOOD\">"
+    "<LineStyle>"
+    "<color>cfff0000</color>"
+    "<width>8</width>"
+    "<gx:labelVisibility>1</gx:labelVisibility>"
+    "</LineStyle>"
+    "</Style>";
 const char *TNT_KML_ROUTE_PLACEMARK_HEADER =
     "<Placemark>"
     "<styleUrl>%s</styleUrl>"
@@ -109,9 +126,11 @@ const char *TNT_KML_SINGLE_POINT =
 FILE *pos_pf = NULL;
 FILE *kml_pf = NULL;
 
+const char *FAIL_STYLE = "FAIL";
 const char *BAD_STYLE = "BAD";
 const char *WARN_STYLE = "WARN";
 const char *GOOD_STYLE = "GOOD";
+const char *EXCEPTIONAL_STYLE = "EXCEPTIONAL";
 const char *VNAME_CELL = "Cell";
 const char *VNAME_NOHANDS = "No Hands";
 const char *VNAME_BADHANDS = "Bad Hands";
@@ -120,8 +139,6 @@ const char *VNAME_DECEL = "Decel";
 const char *VNAME_LEFT = "Left";
 const char *VNAME_RIGHT = "Right";
 const char *VNAME_POTHOLE = "Pot Hole";
-
-#define KML_NO_COORD 12345.
 
 uint32_t kml_current_seg_cnt = 0;
 uint32_t kml_current_geo_cnt = 0;
@@ -274,11 +291,11 @@ float calculate_violation_score(float scale)
     calc_violations = violations[V_CELL] * 10;
     calc_violations += violations[V_NOHANDS] * 5;
     calc_violations += violations[V_BADHANDS] * 5;
-    calc_violations += violations[V_ACCEL] * 1;
-    calc_violations += violations[V_DECEL] * 1;
+    calc_violations += violations[V_ACCEL] * 2;
+    calc_violations += violations[V_DECEL] * 2;
     calc_violations += violations[V_LEFT] * 1;
     calc_violations += violations[V_RIGHT] * 1;
-    calc_violations += violations[V_POTHOLE] * 1;
+    calc_violations += violations[V_POTHOLE] * .5;
 
     return calc_violations * scale;
 }
@@ -302,6 +319,8 @@ void *_rec_run(void *args)
     char buffer[REC_QUEUE_MSGSIZE];
     struct timespec poll_sleep;
 
+    bool recording = false;
+
     while (rec_running)
     {
         bytes_read = mq_receive(r_mq, buffer, REC_QUEUE_MSGSIZE, &prio);
@@ -312,73 +331,68 @@ void *_rec_run(void *args)
             {
                 open_pos_fd(r->f_id, r->type == rec_verbose);
                 open_kml_fd();
+                recording = true;
             }
             else if (r->act == rec_close)
             {
                 close_pos_fd();
                 close_kml_fd();
+                recording = false;
             }
-            else
-            {
-                if (r->type == rec_verbose)
-                {
-                    for (int i = 0; i < r->num; i++)
-                    {
-                        unsigned curr_time = clock();
-                        fprintf(pos_pf, "%i,%f,%f,%f,%i,%f,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%lf,%lf\n",
-                                curr_time,
-                                current_x_slope,
-                                current_y_slope,
-                                current_z_slope,
-                                current_inf,
-                                current_conf,
-                                current_pmu.ac_x,
-                                current_pmu.ac_y,
-                                current_pmu.ac_z,
-                                current_pmu.gy_x,
-                                current_pmu.gy_y,
-                                current_pmu.gy_z,
-                                current_gnss.date.year,
-                                current_gnss.date.month,
-                                current_gnss.date.day,
-                                current_gnss.time.hour,
-                                current_gnss.time.minute,
-                                current_gnss.time.sec,
-                                current_gnss.time.usec,
-                                current_gnss.type,
-                                current_gnss.latitude,
-                                current_gnss.longitude);
-                        int rc = fflush(pos_pf);
-                        printf("recording verbose : %d!\n", rc);
-                        usleep(r->delay * 1e3);
-                    }
-                }
-                else if (r->type == rec_terse)
-                {
-                    for (int i = 0; i < r->num; i++)
-                    {
-                        unsigned curr_time = clock();
-                        fprintf(pos_pf, "%i,%i,%f,%i,%i,%i,%i,%i,%i,%i,%i,%i,%lf,%lf\n",
-                                curr_time,
-                                current_inf,
-                                current_conf,
-                                current_imu_bit,
-                                current_gnss.date.year,
-                                current_gnss.date.month,
-                                current_gnss.date.day,
-                                current_gnss.time.hour,
-                                current_gnss.time.minute,
-                                current_gnss.time.sec,
-                                current_gnss.time.usec,
-                                current_gnss.type,
-                                current_gnss.latitude,
-                                current_gnss.longitude);
-                        int rc = fflush(pos_pf);
-                        printf("recording terse : %d!\n", rc);
-                        usleep(r->delay * 1e3);
-                    }
-                }
-            }
+        }
+        if (recording && r->type == rec_verbose)
+        {
+            unsigned curr_time = clock();
+            fprintf(pos_pf, "%i,%f,%f,%f,%i,%f,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%i,%lf,%lf\n",
+                    curr_time,
+                    current_x_slope,
+                    current_y_slope,
+                    current_z_slope,
+                    current_inf,
+                    current_conf,
+                    current_pmu.ac_x,
+                    current_pmu.ac_y,
+                    current_pmu.ac_z,
+                    current_pmu.gy_x,
+                    current_pmu.gy_y,
+                    current_pmu.gy_z,
+                    current_gnss.date.year,
+                    current_gnss.date.month,
+                    current_gnss.date.day,
+                    current_gnss.time.hour,
+                    current_gnss.time.minute,
+                    current_gnss.time.sec,
+                    current_gnss.time.usec,
+                    current_gnss.type,
+                    current_gnss.latitude,
+                    current_gnss.longitude);
+            int rc = fflush(pos_pf);
+            printf("recording verbose : %d!\n", rc);
+        }
+        else if (recording && r->type == rec_terse)
+        {
+            unsigned curr_time = clock();
+            fprintf(pos_pf, "%i,%i,%f,%i,%i,%i,%i,%i,%i,%i,%i,%i,%lf,%lf\n",
+                    curr_time,
+                    current_inf,
+                    current_conf,
+                    current_imu_bit,
+                    current_gnss.date.year,
+                    current_gnss.date.month,
+                    current_gnss.date.day,
+                    current_gnss.time.hour,
+                    current_gnss.time.minute,
+                    current_gnss.time.sec,
+                    current_gnss.time.usec,
+                    current_gnss.type,
+                    current_gnss.latitude,
+                    current_gnss.longitude);
+            int rc = fflush(pos_pf);
+            printf("recording terse : %d!\n", rc);
+        }
+
+        if (recording) // KML
+        {
             if (current_inf == CELL_IDX)
                 violations[V_CELL] += 1;
             if (current_inf == NONE_IDX)
@@ -412,15 +426,23 @@ void *_rec_run(void *args)
 
                     if (score < 50.)
                     {
+                        write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER, FAIL_STYLE, 0);
+                    }
+                    else if (score < 60.)
+                    {
                         write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER, BAD_STYLE, 0);
                     }
                     else if (score < 70.)
                     {
                         write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER, WARN_STYLE, 0);
                     }
-                    else
+                    else if (score < 80.)
                     {
                         write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER, GOOD_STYLE, 0);
+                    }
+                    else
+                    {
+                        write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER, EXCEPTIONAL_STYLE, 0);
                     }
 
                     for (struct gnss_data gd : gnss_points)
@@ -443,17 +465,14 @@ void *_rec_run(void *args)
                     write_kml_fd(TNT_KML_POINT_PLACEMARK_FOOTER, 0);
                     gnss_points.erase(gnss_points.begin(), gnss_points.end() - 1);
 
-                    //clear violations
+                    // clear violations
                     for (int i = 0; i < V_NUM; i++)
                         violations[i] = 0;
-                }
-            }
-        }
-        else
-        {
-            usleep(10 * 1e3);
-        }
-    }
+                }           // segment
+            }               // if current_gns
+        }                   // if recording (kml)
+        usleep(1000 * 1e3); // 1 hz recording samples
+    }                       // while running
     printf("rec cleaning mq\n");
     mq_close(r_mq);
     return NULL;

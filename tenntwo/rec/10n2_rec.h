@@ -20,8 +20,6 @@ extern "C"
     } rec_type;
     struct rec_req
     {
-        int8_t num;
-        int16_t delay;
         rec_act act;
         rec_type type;
         uint8_t f_id;

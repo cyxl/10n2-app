@@ -156,16 +156,16 @@ struct aud_data all_j[num_j][10] = {
     },
     {
         // tf_cell
-        {1, DEF_VOLUME, 100, 20},
+        {1, VIOLATIN_VOLUME, 100, 20},
         {0, 255, 0, 1}, // off
-        {1, DEF_VOLUME, 100, 20},
+        {1, VIOLATIN_VOLUME, 100, 20},
         {0, 255, 0, 1}, // off
-        {1, DEF_VOLUME, 100, 20},
+        {1, VIOLATIN_VOLUME, 100, 20},
         {0, 255, OFF_FREQ, 0}, // done
     },
     {
         // tf_none
-        {1, DEF_VOLUME, 100, 60},
+        {1, VIOLATIN_VOLUME, 100, 60},
         {0, 255, OFF_FREQ, 0}, // done
     },
     {

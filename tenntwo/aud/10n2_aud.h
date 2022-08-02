@@ -19,6 +19,7 @@ extern "C"
   };
 
 #define DEF_VOLUME -20
+#define VIOLATIN_VOLUME -10
 #define JINGLE_MAXLEN 10
 
   enum aud_jingle_type

@@ -61,6 +61,7 @@ void *_cam_q_read(void *args)
     char namebuf[128];
     char dirbuf[128];
     uint16_t current_x0, current_y0, current_x1, current_y1 = 0;
+    uint32_t num_pics = 0;
 
     timespec poll_sleep;
 
@@ -100,7 +101,8 @@ void *_cam_q_read(void *args)
                 cam_release();
                 if (rc == OK)
                 {
-                    send_aud_seq(cam_capture);
+                    num_pics++;
+                    if ((num_pics% 10) == 0 ) send_aud_seq(cam_capture);
                 }
 
                 if (strlen(r->dir) > 0)

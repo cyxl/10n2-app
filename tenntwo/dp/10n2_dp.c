@@ -22,15 +22,20 @@ static bool dp_running = true;
 float current_x_slope;
 float current_y_slope;
 float current_z_slope;
+float current_gx_slope;
+float current_gy_slope;
+float current_gz_slope;
 float current_x_stdev;
 float current_y_stdev;
 float current_z_stdev;
 
-#define YSLOPE_MAX 400
-#define YSLOPE_MIN -400
+#define YSLOPE_MAX 500
+#define YSLOPE_MIN -500
 #define ZSLOPE_MAX 250
 #define ZSLOPE_MIN -250
 #define XSTDEV_MAX 1800
+#define GXSLOPE_MIN -200
+#define GXSLOPE_MAX 200
 
 #define CLEAR_BIT 10
 
@@ -96,9 +101,15 @@ void *_dp_run(void *args)
         float *acx = get_latest_imu_samples(0);
         float *acy = get_latest_imu_samples(1);
         float *acz = get_latest_imu_samples(2);
+        float *gyx = get_latest_imu_samples(3);
+        float *gyy = get_latest_imu_samples(4);
+        float *gyz = get_latest_imu_samples(5);
         current_x_slope = get_slope(acx, IMU_SAMPLE_SIZE);
         current_y_slope = get_slope(acy, IMU_SAMPLE_SIZE);
         current_z_slope = get_slope(acz, IMU_SAMPLE_SIZE);
+        current_gx_slope = get_slope(gyx, IMU_SAMPLE_SIZE);
+        current_gy_slope = get_slope(gyy, IMU_SAMPLE_SIZE);
+        current_gz_slope = get_slope(gyz, IMU_SAMPLE_SIZE);
 
         // std deviations
         arm_std_f32(acx, IMU_SAMPLE_SIZE, &current_x_stdev);
@@ -115,12 +126,12 @@ void *_dp_run(void *args)
             printf("==================decel\n");
             current_imu_bit |= DECEL_BIT;
         }
-        else if (current_z_slope >= ZSLOPE_MAX)
+        else if (current_gx_slope >= GXSLOPE_MAX)
         {
             printf("==================left\n");
             current_imu_bit |= LEFT_BIT;
         }
-        else if (current_z_slope <= ZSLOPE_MIN)
+        else if (current_gx_slope <= GXSLOPE_MIN)
         {
             printf("==================right\n");
             current_imu_bit |= RIGHT_BIT;

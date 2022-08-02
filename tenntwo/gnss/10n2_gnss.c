@@ -61,6 +61,7 @@ void *_gnss_q_read(void *args)
   unsigned int prio;
   ssize_t bytes_read;
   char buffer[GNSS_QUEUE_MSGSIZE];
+  uint32_t num_gps = 0;
 
   int gnss_fd;
   gnss_fd = open("/dev/gps", O_RDONLY);
@@ -141,15 +142,16 @@ void *_gnss_q_read(void *args)
                  received_gnss.receiver.time.sec);
           if (received_gnss.receiver.pos_dataexist)
           {
+            num_gps++;
             /* Detect position. */
             //ioctl(gnss_fd, CXD56_GNSS_IOCTL_SAVE_BACKUP_DATA, 0);
 
             printf("## POSITION: LAT %f, LNG %f \n", current_gnss.latitude, current_gnss.longitude);
-            send_aud_seq(gnss);
+            if ((num_gps % 10) == 0 ) send_aud_seq(gnss);
           }
           else
           {
-            //printf("## NO POSITION: sig level %f\n", received_gnss.sv->siglevel);
+            printf("## NO POSITION: sig level %f\n", received_gnss.sv->siglevel);
             //printf("## No Positioning Data\n");
           }
         }

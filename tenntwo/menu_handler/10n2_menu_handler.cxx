@@ -25,7 +25,7 @@
 #include <10n2_rec.h>
 #include <10n2_dp.h>
 
-#define INF_CONF 5.
+#define INF_CONF .5
 
 static bool menu_handler_running = true;
 
@@ -36,14 +36,12 @@ struct cam_req cam_nowrite_bw_r = {1, 0, 192, 12, 288, 108, 0, ""};
 struct cam_req cam_hands_bw_r = {1, 0, 192, 12, 288, 108, 0, "hds"};
 struct cam_req cam_cell_bw_r = {1, 0, 192, 12, 288, 108, 0, "cell"};
 struct cam_req cam_none_bw_r = {1, 0, 192, 12, 288, 108, 0, "none"};
-struct rec_req rec_open_verbose_r = {0, 0, rec_open, rec_verbose, 0};
-struct rec_req rec_open_terse_r = {0, 0, rec_open, rec_terse, 0};
-struct rec_req rec_close_r = {0, 0, rec_close, rec_verbose, 0}; // dont care type
-struct rec_req rec_verbose_r = {1, 0, rec_write, rec_verbose, 0};
-struct rec_req rec_terse_r = {1, 0, rec_write, rec_terse, 0};
+struct rec_req rec_open_verbose_r = {rec_open, rec_verbose, 0};
+struct rec_req rec_open_terse_r = {rec_open, rec_terse, 0};
+struct rec_req rec_close_r = {rec_close, rec_verbose, 0}; // dont care type
 
 #define CAM_TRAIN_PERIOD 10 
-#define INF_PERIOD 80
+#define INF_PERIOD 40
 
 #define WARN_WAIT 100
 
@@ -104,17 +102,6 @@ void update_service(uint8_t menu,uint8_t last_submenu, uint32_t tick)
             send_cam_req(cam_nowrite_bw_r);
             send_tf_req(tf_r);
 
-            if (current_submenu == inf_rec_verbose)
-            {
-                // send record
-                send_rec_req(rec_verbose_r);
-            }
-            if (current_submenu == inf_rec_terse)
-            {
-                // send record
-                send_rec_req(rec_terse_r);
-            }
-
             // Process current inferences
             if (current_conf > INF_CONF)
             {
@@ -140,31 +127,31 @@ void update_service(uint8_t menu,uint8_t last_submenu, uint32_t tick)
         if ((current_imu_bit & ACCEL_BIT) && ((tick - accel_warn_time) > WARN_WAIT))
         {
             printf("warning accel %f\n", current_y_slope);
-            //send_aud_seq(imu_accel);
+            send_aud_seq(imu_accel);
             accel_warn_time = tick;
         }
         else if ((current_imu_bit & DECEL_BIT) && ((tick - decel_warn_time) > WARN_WAIT))
         {
             printf("warning decel\n");
-            //send_aud_seq(imu_decel);
+            send_aud_seq(imu_decel);
             decel_warn_time = tick;
         }
         else if ((current_imu_bit & LEFT_BIT) && ((tick - turn_warn_time) > WARN_WAIT))
         {
             printf("l turn\n");
-            //send_aud_seq(imu_turn);
+            send_aud_seq(imu_turn);
             turn_warn_time = tick;
         }
         else if ((current_imu_bit & RIGHT_BIT) && ((tick - turn_warn_time) > WARN_WAIT))
         {
             printf("r turn\n");
-            //send_aud_seq(imu_turn);
+            send_aud_seq(imu_turn);
             turn_warn_time = tick;
         }
         else if ((current_imu_bit & POTHOLE_BIT) && ((tick - pothole_warn_time) > WARN_WAIT))
         {
             printf("r stdev\n %f", current_x_stdev);
-            //TODOsend_aud_seq(pothole_j, POTHOLE_J_LEN);
+            send_aud_seq(imu_pothole);
             pothole_warn_time = tick;
         }
     }

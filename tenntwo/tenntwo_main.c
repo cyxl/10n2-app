@@ -28,7 +28,7 @@ int tenntwo_main(int argc, char *argv[])
 
   printf("TNT start\n");
 
-  struct imu_req imu_r = {1e6, 50};
+  struct imu_req imu_r = {1e6, 150};
   struct gnss_req gnss_r = {1e6, 500};
 
   aud_init();
@@ -49,7 +49,7 @@ int tenntwo_main(int argc, char *argv[])
   while (1)
   {
     //send_gnss_req(gnss_r);
-    nxsig_usleep(1 * 1e6); /* usecs (arbitrary) */
+    nxsig_usleep(100 * 1e6); /* usecs (arbitrary) */
     printf("zzzz....\n");
     if (current_menu == top && current_submenu == top_quit)
       break;
