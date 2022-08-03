@@ -11,7 +11,9 @@
 #include <sys/types.h>
 #include <fcntl.h>
 #include <time.h>
+#include <endian.h>
 #include <arch/board/board.h>
+#include <netutils/base64.h>
 #include <nuttx/clock.h>
 #include <nuttx/arch.h>
 #include <10n2_rec.h>
@@ -23,6 +25,11 @@
 #include <10n2_dp.h>
 #include <10n2_tf_pi.h>
 
+// headers + color map + pixel data
+#define BMP_HDR_BUFSIZE 40 + 14 + (256 * 4)
+#define B64_IMG_BUFSIZE 96 * 96
+#define B64_TOT_BUFSIZE (BMP_HDR_BUFSIZE + B64_IMG_BUFSIZE) * 2
+#define BIN_TOT_BUFSIZE (BMP_HDR_BUFSIZE + B64_IMG_BUFSIZE)
 static bool rec_running = true;
 #define REC_QUEUE_NAME "/rec_queue" /* Queue name. */
 #define REC_QUEUE_PERMS ((int)(0644))
@@ -40,7 +47,7 @@ static struct mq_attr rec_attr_mq = REC_QUEUE_ATTR_INITIALIZER;
 
 const char *TNT_KML_HEADER =
     "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
-    "<kml xmlns=\"http://earth.google.com/kml/2.0\"> <Document>";
+    "<kml xmlns=\"http://earth.google.com/kml/2.0\"  xmlns:gx=\"http://www.google.com/kml/ext/2.2\" xmlns:kml=\"http://www.opengis.net/kml/2.2\" xmlns:atom=\"http://www.w3.org/2005/Atom\"> <Document>";
 
 const char *TNT_KML_FOOTER =
     "</Document> </kml>";
@@ -109,17 +116,40 @@ const char *TNT_KML_POINT_PLACEMARK_HEADER =
     "<Point>"
     "<coordinates>%lf,%lf"
     "</coordinates>"
-    "</Point>"
-    "<ExtendedData>";
+    "</Point>";
 
+const char *TNT_KML_POINT_PIC_PLACEMARK =
+    "<Placemark>"
+    "<Point>"
+    "<coordinates>%lf,%lf"
+    "</coordinates>"
+    "</Point>"
+    "<description>\n"
+    "<![CDATA[\n"
+    "<img src=\"data:image/bmp;base64,%s\"/>\n"
+    "]]>\n"
+    "</description>"
+    "</Placemark>";
+
+const char *TNT_KML_POINT_EXT_HEADER =
+    "<ExtendedData>";
+const char *TNT_KML_POINT_EXT_FOOTER =
+    "</ExtendedData>";
 const char *TNT_KML_POINT_PLACEMARK_FOOTER =
-    "</ExtendedData>"
     "</Placemark>";
 
 const char *TNT_KML_EXTENDED_DATA =
     "<Data name=\"%s\">"
     "<value>%i</value>"
     "</Data>";
+const char *TNT_IMAGE_EMBED =
+    "<gx:Carousel>"
+    "<gx:Image kml:id=\"%i\">"
+    "<gx:ImageUrl>data:image/bmp;base64,%s%s"
+    "</gx:ImageUrl>"
+    "</gx:Image>"
+    "</gx:Carousel>";
+
 const char *TNT_KML_SINGLE_POINT =
     "%lf,%lf\n";
 
@@ -157,6 +187,89 @@ std::vector<struct gnss_data> gnss_points;
 
 uint16_t violations[V_NUM] = {0};
 
+void get_gray_cm(char *map)
+{
+
+    for (uint8_t i = 0; i < 256; i++)
+    {
+        uint32_t c = (128 << 16);
+        c |= (128 << 8);
+        c |= 128; // grey
+        c |= (i << 24);
+        memcpy(&map[i * 4], &c, sizeof(uint32_t));
+    }
+}
+void get_bmp_header(char *hdr, uint8_t h_size, uint8_t v_size)
+{
+    // bitmap signature
+    hdr[0] = 'B';
+    hdr[1] = 'M';
+
+    // file size
+    uint32_t fsize = 40 + 14 + (256 * 4) + h_size * v_size; // headers + color map + pixel data
+    memcpy((void *)&hdr[2], &fsize, sizeof(int));
+
+    // reserved field (in hex. 00 00 00 00)
+    for (int i = 6; i < 10; i++)
+        hdr[i] = 0;
+
+    // offset of pixel data inside the image
+    int offset = 40 + 14 + (256 * 4); // headers + color map
+    memcpy((void *)&hdr[10], &offset, sizeof(int));
+
+    // -- hdr HEADER -- //
+
+    // header size
+    int t = 40;
+    memcpy((void *)&hdr[14], &t, sizeof(int));
+
+    // width of the image
+    t = h_size;
+    memcpy((void *)&hdr[18], &t, sizeof(int));
+
+    // height of the image
+    t = v_size;
+    memcpy((void *)&hdr[22], &t, sizeof(int));
+
+    // reserved field
+    hdr[26] = 1;
+    hdr[27] = 0;
+
+    // number of bits per pixel
+    uint16_t bpp = 8;
+    memcpy((void *)&hdr[28], &bpp, sizeof(uint16_t));
+
+    // compression method (no compression here)
+    for (int i = 30; i < 34; i++)
+        hdr[i] = 0;
+
+    // size of pixel data
+    uint32_t pix_size = 0;
+    memcpy((void *)&hdr[34], &pix_size, sizeof(uint32_t));
+
+    // horizontal resolution of the image - pixels per meter (2835)
+    hdr[38] = 0;
+    hdr[39] = 0;
+    hdr[40] = 0;
+    hdr[41] = 0;
+
+    // vertical resolution of the image - pixels per meter (2835)
+    hdr[42] = 0;
+    hdr[43] = 0;
+    hdr[44] = 0;
+    hdr[45] = 0;
+
+    // color pallette information
+    // uint32_t nc=256;
+    uint32_t nc = 0;
+    memcpy((void *)&hdr[46], &nc, sizeof(uint32_t));
+
+    // number of important colors
+    for (int i = 50; i < 54; i++)
+        hdr[i] = 0;
+
+    //    get_gray_cm(&hdr[54]);
+}
 void write_kml_fd(const char *s, int n, ...)
 {
     va_list args;
@@ -176,12 +289,28 @@ void write_kml_fd_si(const char *f, const char *s, int i)
         fflush(kml_pf);
     }
 }
+void write_kml_fd_is(const char *f, int i, const char *s)
+{
+    if (kml_pf != NULL)
+    {
+        fprintf(kml_pf, f, i, s);
+        fflush(kml_pf);
+    }
+}
 
 void write_kml_fd_ff(const char *fmt, float f, float f2)
 {
     if (kml_pf != NULL)
     {
         fprintf(kml_pf, fmt, f, f2);
+        fflush(kml_pf);
+    }
+}
+void write_kml_fd_ffs(const char *fmt, float f, float f2, char *s)
+{
+    if (kml_pf != NULL)
+    {
+        fprintf(kml_pf, fmt, f, f2, s);
         fflush(kml_pf);
     }
 }
@@ -319,6 +448,15 @@ void *_rec_run(void *args)
     char buffer[REC_QUEUE_MSGSIZE];
     struct timespec poll_sleep;
 
+    bool got_b64_img = false;
+    char *b64_buf = (char *)malloc(B64_TOT_BUFSIZE);
+    char *bin_buf = (char *)malloc(BIN_TOT_BUFSIZE);
+    int bmp_header_size = BMP_HDR_BUFSIZE; // headers + color map + pixel data
+    char *bmp_header = (char *)malloc(bmp_header_size);
+    get_bmp_header(bmp_header, 96, 96);
+    memcpy(bin_buf, bmp_header, BMP_HDR_BUFSIZE);
+    free(bmp_header);
+
     bool recording = false;
 
     while (rec_running)
@@ -394,7 +532,11 @@ void *_rec_run(void *args)
         if (recording) // KML
         {
             if (current_inf == CELL_IDX)
+            {
                 violations[V_CELL] += 1;
+                got_b64_img = true;
+                memcpy(bin_buf + BMP_HDR_BUFSIZE, latest_img_buf, B64_IMG_BUFSIZE);
+            }
             if (current_inf == NONE_IDX)
                 violations[V_NOHANDS] += 1;
             if (current_inf == BAD_IDX)
@@ -412,7 +554,8 @@ void *_rec_run(void *args)
 
             // KML
             kml_current_seg_cnt += 1;
-            if (current_gnss.data_exists)
+            // TODO if (current_gnss.data_exists)
+            if (true)
             {
                 gnss_points.push_back(current_gnss);
                 printf("got gnss %i %s\n", current_gnss.type, VNAME_ACCEL);
@@ -453,6 +596,7 @@ void *_rec_run(void *args)
 
                     write_kml_fd_ff(TNT_KML_POINT_PLACEMARK_HEADER, gnss_points.back().longitude, gnss_points.back().latitude);
 
+                    write_kml_fd(TNT_KML_POINT_EXT_HEADER, 0);
                     write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_CELL, violations[V_CELL]);
                     write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_NOHANDS, violations[V_NOHANDS]);
                     write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_BADHANDS, violations[V_BADHANDS]);
@@ -461,18 +605,29 @@ void *_rec_run(void *args)
                     write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_LEFT, violations[V_LEFT]);
                     write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_RIGHT, violations[V_RIGHT]);
                     write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_POTHOLE, violations[V_POTHOLE]);
+                    write_kml_fd(TNT_KML_POINT_EXT_FOOTER, 0);
 
                     write_kml_fd(TNT_KML_POINT_PLACEMARK_FOOTER, 0);
+
+                    if (got_b64_img)
+                    {
+                        size_t b64_buf_size = BIN_TOT_BUFSIZE;
+                        base64_encode((void *)bin_buf, BIN_TOT_BUFSIZE, b64_buf, &b64_buf_size);
+                        //printf("encoded to %i bytes %s\n", b64_buf_size, b64_buf);
+                        write_kml_fd_ffs(TNT_KML_POINT_PIC_PLACEMARK, gnss_points.back().longitude, gnss_points.back().latitude, b64_buf);
+                    }
                     gnss_points.erase(gnss_points.begin(), gnss_points.end() - 1);
 
                     // clear violations
                     for (int i = 0; i < V_NUM; i++)
                         violations[i] = 0;
+                    got_b64_img = false;
                 }           // segment
             }               // if current_gns
         }                   // if recording (kml)
         usleep(1000 * 1e3); // 1 hz recording samples
     }                       // while running
+    free(b64_buf);
     printf("rec cleaning mq\n");
     mq_close(r_mq);
     return NULL;

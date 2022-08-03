@@ -13,6 +13,7 @@
 #include <time.h>
 #include <arch/board/board.h>
 #include <arch/chip/audio.h>
+#include <netutils/base64.h>
 
 #include <nuttx/arch.h>
 #include <10n2_cam.h>
@@ -40,8 +41,8 @@ void *_cam_q_read(void *args)
     (void)args; /* Suppress -Wunused-parameter warning. */
     /* Initialize the queue attributes */
 
-//    int cpu = up_cpu_index();
- //   printf("CAM CPU %d\n", cpu);
+    int cpu = up_cpu_index();
+    printf("CAM CPU %d\n", cpu);
 
     /* Create the message queue. The queue reader is NONBLOCK. */
     mqd_t r_mq = mq_open(CAM_QUEUE_NAME, O_CREAT | O_RDWR | O_NONBLOCK, CAM_QUEUE_PERMS, &cam_attr_mq);
@@ -91,7 +92,7 @@ void *_cam_q_read(void *args)
                 printf("ERROR - unable to malloc buf\n");
                 break;
             }
-            latest_img_buf = buf;
+
             for (int i = 0; i < r->num; i++)
             {
                 bzero(namebuf, 128);
@@ -102,7 +103,9 @@ void *_cam_q_read(void *args)
                 if (rc == OK)
                 {
                     num_pics++;
-                    if ((num_pics% 10) == 0 ) send_aud_seq(cam_capture);
+                    latest_img_buf = buf;
+                    if ((num_pics % 10) == 0)
+                        send_aud_seq(cam_capture);
                 }
 
                 if (strlen(r->dir) > 0)
@@ -155,7 +158,7 @@ bool cam_init(void)
     cam_running = true;
     pthread_create(&cam_th_consumer, NULL, &_cam_q_read, NULL);
     cpu_set_t cpuset = 1 << 3;
-    int rc=0;
+    int rc = 0;
     rc = pthread_setaffinity_np(cam_th_consumer, sizeof(cpu_set_t), &cpuset);
     if (rc != 0)
     {
