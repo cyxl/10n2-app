@@ -14,7 +14,7 @@ extern "C"
 #define BAD_IDX -1 
 #define UNKNOWN_IDX -42
 
-#define INF_CONF .6
+#define INF_CONF .7
 
 #include <stdint.h>
     struct tf_req

@@ -96,6 +96,25 @@ const char *TNT_KML_EXCEPTIONAL_LINESTYLE =
     "<gx:labelVisibility>1</gx:labelVisibility>"
     "</LineStyle>"
     "</Style>";
+const char *TNT_KML_DESCRIPTION_STYLE =
+    "<Style id=\"TNT_STYLE\">"
+    " <BalloonStyle>"
+    "    <text>"
+    "      <![CDATA["
+    "      $[description]<P>"
+    "      <B>Cell: $[Cell]</B><br>"
+    "      <B>No Hands: $[No Hands]</B><br>"
+    "      <B>Bad Hands: $[Bad Hands]</B><br>"
+    "      <B>Accel : $[Accel]</B><br>"
+    "      <B>Decel : $[Decel]</B><br>"
+    "      <B>Hard Left: $[Left]</B><br>"
+    "      <B>Hard Right: $[Right]</B><br>"
+    "      <B>Pot Hole: $[Pot Hole]</B><br>"
+    "        ]]>"
+    "    </text>"
+    "  </BalloonStyle>"
+    "</Style>";
+
 const char *TNT_KML_ROUTE_PLACEMARK_HEADER =
     "<Placemark>"
     "<styleUrl>%s</styleUrl>"
@@ -113,6 +132,7 @@ const char *TNT_KML_ROUTE_PLACEMARK_FOOTER =
 
 const char *TNT_KML_POINT_PLACEMARK_HEADER =
     "<Placemark>"
+    "<styleUrl>#TNT_STYLE</styleUrl>"
     "<Point>"
     "<coordinates>%lf,%lf"
     "</coordinates>"
@@ -131,6 +151,13 @@ const char *TNT_KML_POINT_PIC_PLACEMARK =
     "</description>"
     "</Placemark>";
 
+const char *TNT_KML_PIC_DESCRIPTION =
+    "<description>\n"
+    "<![CDATA[\n"
+    "<img src=\"data:image/bmp;base64,%s\"/>\n"
+    "]]>\n"
+    "</description>";
+
 const char *TNT_KML_POINT_EXT_HEADER =
     "<ExtendedData>";
 const char *TNT_KML_POINT_EXT_FOOTER =
@@ -142,13 +169,6 @@ const char *TNT_KML_EXTENDED_DATA =
     "<Data name=\"%s\">"
     "<value>%i</value>"
     "</Data>";
-const char *TNT_IMAGE_EMBED =
-    "<gx:Carousel>"
-    "<gx:Image kml:id=\"%i\">"
-    "<gx:ImageUrl>data:image/bmp;base64,%s%s"
-    "</gx:ImageUrl>"
-    "</gx:Image>"
-    "</gx:Carousel>";
 
 const char *TNT_KML_SINGLE_POINT =
     "%lf,%lf\n";
@@ -282,6 +302,14 @@ void write_kml_fd(const char *s, int n, ...)
     }
     va_end(args);
 }
+void write_kml_fd_s(const char *f, const char *s)
+{
+    if (kml_pf != NULL)
+    {
+        fprintf(kml_pf, f, s);
+        fflush(kml_pf);
+    }
+}
 void write_kml_fd_si(const char *f, const char *s, int i)
 {
     if (kml_pf != NULL)
@@ -408,6 +436,7 @@ void open_kml_fd()
 
     gnss_points.clear();
     write_kml_fd(TNT_KML_HEADER, 0);
+    write_kml_fd(TNT_KML_DESCRIPTION_STYLE, 0);
     write_kml_fd(TNT_KML_WARN_LINESTYLE, 0);
     write_kml_fd(TNT_KML_FAIL_LINESTYLE, 0);
     write_kml_fd(TNT_KML_EXCEPTIONAL_LINESTYLE, 0);
@@ -560,7 +589,8 @@ void *_rec_run(void *args)
 
             // KML
             kml_current_seg_cnt += 1;
-            if (current_gnss.data_exists)
+            //if (current_gnss.data_exists)
+            if (true)
             {
                 gnss_points.push_back(current_gnss);
                 printf("got gnss %i %s\n", current_gnss.type, VNAME_ACCEL);
@@ -602,6 +632,7 @@ void *_rec_run(void *args)
 
                     write_kml_fd_ff(TNT_KML_POINT_PLACEMARK_HEADER, gnss_points.back().longitude, gnss_points.back().latitude);
 
+                    //Extended Data
                     write_kml_fd(TNT_KML_POINT_EXT_HEADER, 0);
                     write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_CELL, violations[V_CELL]);
                     write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_NOHANDS, violations[V_NOHANDS]);
@@ -613,15 +644,17 @@ void *_rec_run(void *args)
                     write_kml_fd_si(TNT_KML_EXTENDED_DATA, VNAME_POTHOLE, violations[V_POTHOLE]);
                     write_kml_fd(TNT_KML_POINT_EXT_FOOTER, 0);
 
-                    write_kml_fd(TNT_KML_POINT_PLACEMARK_FOOTER, 0);
-
                     if (got_b64_img)
                     {
                         size_t b64_buf_size = BIN_TOT_BUFSIZE;
                         base64_encode((void *)bin_buf, BIN_TOT_BUFSIZE, b64_buf, &b64_buf_size);
                         // printf("encoded to %i bytes %s\n", b64_buf_size, b64_buf);
-                        write_kml_fd_ffs(TNT_KML_POINT_PIC_PLACEMARK, gnss_points.back().longitude, gnss_points.back().latitude, b64_buf);
+                        write_kml_fd_s(TNT_KML_PIC_DESCRIPTION, b64_buf);
                     }
+
+
+                    write_kml_fd(TNT_KML_POINT_PLACEMARK_FOOTER, 0);
+
                     gnss_points.erase(gnss_points.begin(), gnss_points.end() - 1);
 
                     // clear violations
