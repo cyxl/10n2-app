@@ -25,7 +25,6 @@
 #include <10n2_rec.h>
 #include <10n2_dp.h>
 
-#define INF_CONF .5
 
 static bool menu_handler_running = true;
 
@@ -127,31 +126,31 @@ void update_service(uint8_t menu,uint8_t last_submenu, uint32_t tick)
         if ((current_imu_bit & ACCEL_BIT) && ((tick - accel_warn_time) > WARN_WAIT))
         {
             printf("warning accel %f\n", current_y_slope);
-            send_aud_seq(imu_accel);
+            //TODOsend_aud_seq(imu_accel);
             accel_warn_time = tick;
         }
         else if ((current_imu_bit & DECEL_BIT) && ((tick - decel_warn_time) > WARN_WAIT))
         {
             printf("warning decel\n");
-            send_aud_seq(imu_decel);
+            //TODOsend_aud_seq(imu_decel);
             decel_warn_time = tick;
         }
         else if ((current_imu_bit & LEFT_BIT) && ((tick - turn_warn_time) > WARN_WAIT))
         {
             printf("l turn\n");
-            send_aud_seq(imu_turn);
+            //TODOsend_aud_seq(imu_turn);
             turn_warn_time = tick;
         }
         else if ((current_imu_bit & RIGHT_BIT) && ((tick - turn_warn_time) > WARN_WAIT))
         {
             printf("r turn\n");
-            send_aud_seq(imu_turn);
+            //TODOsend_aud_seq(imu_turn);
             turn_warn_time = tick;
         }
         else if ((current_imu_bit & POTHOLE_BIT) && ((tick - pothole_warn_time) > WARN_WAIT))
         {
             printf("r stdev\n %f", current_x_stdev);
-            send_aud_seq(imu_pothole);
+            //TODOsend_aud_seq(imu_pothole);
             pothole_warn_time = tick;
         }
     }

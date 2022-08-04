@@ -89,7 +89,7 @@ const char *TNT_KML_GOOD_LINESTYLE =
     "</Style>";
 
 const char *TNT_KML_EXCEPTIONAL_LINESTYLE =
-    "<Style id=\"GOOD\">"
+    "<Style id=\"EXCEPTIONAL\">"
     "<LineStyle>"
     "<color>cfff0000</color>"
     "<width>8</width>"
@@ -190,11 +190,12 @@ uint16_t violations[V_NUM] = {0};
 void get_gray_cm(char *map)
 {
 
-    for (uint8_t i = 0; i < 256; i++)
+    // TODO 255 ???
+    for (uint8_t i = 0; i < 255; i++)
     {
-        uint32_t c = (128 << 16);
-        c |= (128 << 8);
-        c |= 128; // grey
+        uint32_t c = (i << 16);
+        c |= (i << 8);
+        c |= i;
         c |= (i << 24);
         memcpy(&map[i * 4], &c, sizeof(uint32_t));
     }
@@ -268,7 +269,7 @@ void get_bmp_header(char *hdr, uint8_t h_size, uint8_t v_size)
     for (int i = 50; i < 54; i++)
         hdr[i] = 0;
 
-    //    get_gray_cm(&hdr[54]);
+    get_gray_cm(&hdr[54]);
 }
 void write_kml_fd(const char *s, int n, ...)
 {
@@ -408,6 +409,8 @@ void open_kml_fd()
     gnss_points.clear();
     write_kml_fd(TNT_KML_HEADER, 0);
     write_kml_fd(TNT_KML_WARN_LINESTYLE, 0);
+    write_kml_fd(TNT_KML_FAIL_LINESTYLE, 0);
+    write_kml_fd(TNT_KML_EXCEPTIONAL_LINESTYLE, 0);
     write_kml_fd(TNT_KML_BAD_LINESTYLE, 0);
     write_kml_fd(TNT_KML_GOOD_LINESTYLE, 0);
     fflush(kml_pf);
@@ -417,13 +420,13 @@ float calculate_violation_score(float scale)
 {
     float calc_violations = 0;
 
-    calc_violations = violations[V_CELL] * 10;
-    calc_violations += violations[V_NOHANDS] * 5;
-    calc_violations += violations[V_BADHANDS] * 5;
-    calc_violations += violations[V_ACCEL] * 2;
-    calc_violations += violations[V_DECEL] * 2;
-    calc_violations += violations[V_LEFT] * 1;
-    calc_violations += violations[V_RIGHT] * 1;
+    calc_violations = violations[V_CELL] * 10.;
+    calc_violations += violations[V_NOHANDS] * 5.;
+    calc_violations += violations[V_BADHANDS] * 5.;
+    calc_violations += violations[V_ACCEL] * 2.;
+    calc_violations += violations[V_DECEL] * 2.;
+    calc_violations += violations[V_LEFT] * 1.;
+    calc_violations += violations[V_RIGHT] * 1.;
     calc_violations += violations[V_POTHOLE] * .5;
 
     return calc_violations * scale;
@@ -531,31 +534,33 @@ void *_rec_run(void *args)
 
         if (recording) // KML
         {
-            if (current_inf == CELL_IDX)
+            if (current_conf > INF_CONF)
             {
-                violations[V_CELL] += 1;
-                got_b64_img = true;
-                memcpy(bin_buf + BMP_HDR_BUFSIZE, latest_img_buf, B64_IMG_BUFSIZE);
+                if (current_inf == CELL_IDX)
+                {
+                    violations[V_CELL] += 1;
+                    got_b64_img = true;
+                    memcpy(bin_buf + BMP_HDR_BUFSIZE, latest_img_buf, B64_IMG_BUFSIZE);
+                }
+                if (current_inf == NONE_IDX)
+                    violations[V_NOHANDS] += 1;
+                if (current_inf == BAD_IDX)
+                    violations[V_BADHANDS] += 1;
+                if (current_imu_bit & ACCEL_BIT)
+                    violations[V_ACCEL] += 1;
+                if (current_imu_bit & DECEL_BIT)
+                    violations[V_DECEL] += 1;
+                if (current_imu_bit & LEFT_BIT)
+                    violations[V_LEFT] += 1;
+                if (current_imu_bit & RIGHT_BIT)
+                    violations[V_RIGHT] += 1;
+                if (current_imu_bit & POTHOLE_BIT)
+                    violations[V_POTHOLE] += 1;
             }
-            if (current_inf == NONE_IDX)
-                violations[V_NOHANDS] += 1;
-            if (current_inf == BAD_IDX)
-                violations[V_BADHANDS] += 1;
-            if (current_imu_bit & ACCEL_BIT)
-                violations[V_ACCEL] += 1;
-            if (current_imu_bit & DECEL_BIT)
-                violations[V_DECEL] += 1;
-            if (current_imu_bit & LEFT_BIT)
-                violations[V_LEFT] += 1;
-            if (current_imu_bit & RIGHT_BIT)
-                violations[V_RIGHT] += 1;
-            if (current_imu_bit & POTHOLE_BIT)
-                violations[V_POTHOLE] += 1;
 
             // KML
             kml_current_seg_cnt += 1;
-            // TODO if (current_gnss.data_exists)
-            if (true)
+            if (current_gnss.data_exists)
             {
                 gnss_points.push_back(current_gnss);
                 printf("got gnss %i %s\n", current_gnss.type, VNAME_ACCEL);
@@ -563,23 +568,24 @@ void *_rec_run(void *args)
 
                 if ((kml_current_geo_cnt % KML_NUM_POINTS_IN_SEGMENT) == 0)
                 {
-                    float violation_score = calculate_violation_score(1. / kml_current_seg_cnt);
+                    //float violation_score = calculate_violation_score(1. / kml_current_seg_cnt);
+                    float violation_score = calculate_violation_score(1. / 5.);
                     kml_current_seg_cnt = 0;
                     float score = 100 - violation_score;
 
-                    if (score < 50.)
+                    if (score < 70.)
                     {
                         write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER, FAIL_STYLE, 0);
                     }
-                    else if (score < 60.)
+                    else if (score < 80.)
                     {
                         write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER, BAD_STYLE, 0);
                     }
-                    else if (score < 70.)
+                    else if (score < 85.)
                     {
                         write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER, WARN_STYLE, 0);
                     }
-                    else if (score < 80.)
+                    else if (score < 95.)
                     {
                         write_kml_fd_si(TNT_KML_ROUTE_PLACEMARK_HEADER, GOOD_STYLE, 0);
                     }
@@ -613,7 +619,7 @@ void *_rec_run(void *args)
                     {
                         size_t b64_buf_size = BIN_TOT_BUFSIZE;
                         base64_encode((void *)bin_buf, BIN_TOT_BUFSIZE, b64_buf, &b64_buf_size);
-                        //printf("encoded to %i bytes %s\n", b64_buf_size, b64_buf);
+                        // printf("encoded to %i bytes %s\n", b64_buf_size, b64_buf);
                         write_kml_fd_ffs(TNT_KML_POINT_PIC_PLACEMARK, gnss_points.back().longitude, gnss_points.back().latitude, b64_buf);
                     }
                     gnss_points.erase(gnss_points.begin(), gnss_points.end() - 1);
