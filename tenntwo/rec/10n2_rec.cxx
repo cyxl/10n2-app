@@ -589,8 +589,7 @@ void *_rec_run(void *args)
 
             // KML
             kml_current_seg_cnt += 1;
-            //if (current_gnss.data_exists)
-            if (true)
+            if (current_gnss.data_exists)
             {
                 gnss_points.push_back(current_gnss);
                 printf("got gnss %i %s\n", current_gnss.type, VNAME_ACCEL);
